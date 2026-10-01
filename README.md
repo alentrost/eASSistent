@@ -11,8 +11,10 @@
 
 ## 🚀 Prenos APK
 
-Najnovejšo APK datoteko lahko prenesete neposredno preko spodnje povezave:
+Najnovejšo izpeljavo aplikacije (APK) lahko prenesete neposredno preko GitHub izdaje (Release):
 
-📥 **[Prenesi eASSistent APK (app-debug.apk)](app/build/outputs/apk/debug/app-debug.apk)**
+📥 **[Prenesi eASSistent-v1.0.0.apk (Direkten prenos z GitHub Releases)](https://github.com/alentrost/eASSistent/releases/download/v1.0.0/eASSistent-v1.0.0.apk)**
+
+Prav tako lahko do izdaje dostopate na strani [eASSistent Releases v1.0.0](https://github.com/alentrost/eASSistent/releases/tag/v1.0.0).
 
 *(Za namestitev APK datoteke na Android napravi omogočite namestitev neznanih aplikacij).*
