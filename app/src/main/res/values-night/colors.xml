@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="ea_blue">#60A5FA</color>
+    <color name="ea_blue_dark">#93C5FD</color>
+    <color name="ea_blue_light">#1E3A8A</color>
+    
+    <color name="ea_bg">#0B1120</color>
+    <color name="ea_surface">#162032</color>
+    <color name="ea_surface_variant">#1E293B</color>
+    <color name="ea_border">#293548</color>
+    <color name="ea_gray_bg">#0B1120</color>
+    <color name="ea_card_border">#293548</color>
+    <color name="ea_class_divider">#475569</color>
+    
+    <color name="ea_text_primary">#F8FAFC</color>
+    <color name="ea_text_secondary">#94A3B8</color>
+    <color name="ea_text_muted">#64748B</color>
+    
+    <!-- Active Hour: Bold strong highlight in dark mode -->
+    <color name="ea_hour_active_bg">#1E3A8A</color>
+    <color name="ea_hour_active_border">#60A5FA</color>
+    <color name="ea_hour_active_text">#93C5FD</color>
+    
+    <!-- Next Hour during Break: Softer less strong highlight in dark mode -->
+    <color name="ea_hour_next_bg">#28234D</color>
+    <color name="ea_hour_next_border">#A5B4FC</color>
+    <color name="ea_hour_next_text">#C7D2FE</color>
+    
+    <!-- Today column highlights in dark mode -->
+    <color name="ea_today_accent">#1E3A8A</color>
+    <color name="ea_today_border">#60A5FA</color>
+    <color name="ea_today_bg">#162032</color>
+    <color name="ea_today_header_bg">#1E3A8A</color>
+    
+    <!-- Dimmed side days (Yesterday & Tomorrow) in dark mode -->
+    <color name="ea_dimmed_bg">#101726</color>
+    <color name="ea_dimmed_header_bg">#162032</color>
+    <color name="ea_dimmed_text">#64748B</color>
+    
+    <!-- Time progress -->
+    <color name="ea_time_passed">#111C2E</color>
+    <color name="ea_time_passed_border">#1E293B</color>
+    <color name="ea_time_active">#1E3A8A</color>
+    
+    <!-- Lunch break (Malica): warm dark gold in dark mode -->
+    <color name="ea_malica_bg">#3A2703</color>
+    <color name="ea_malica_border">#EAB308</color>
+    <color name="ea_malica_text">#FEF08A</color>
+    
+    <!-- School events -->
+    <color name="ea_event_orange">#FBBF24</color>
+    <color name="ea_event_bg">#3A1E03</color>
+    <color name="ea_tag_bg">#1E293B</color>
+    
+    <!-- Edge Gradients: subtle 40% alpha at outer edges, 0% at center -->
+    <color name="ea_gradient_edge_left_start">#70070C16</color>
+    <color name="ea_gradient_edge_left_end">#000B1120</color>
+    <color name="ea_gradient_edge_right_start">#000B1120</color>
+    <color name="ea_gradient_edge_right_end">#70070C16</color>
+</resources>
