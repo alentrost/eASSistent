@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="header_class_name_size">19sp</dimen>
+    <dimen name="header_school_title_size">12sp</dimen>
+    <dimen name="header_week_badge_size">11.5sp</dimen>
+    <dimen name="header_last_updated_size">11sp</dimen>
+    <dimen name="header_jump_today_size">11.5sp</dimen>
+    <dimen name="header_padding_horizontal">14dp</dimen>
+    <dimen name="header_padding_vertical">10dp</dimen>
+    
+    <dimen name="day_badge_size">10sp</dimen>
+    <dimen name="day_name_size">13sp</dimen>
+    <dimen name="day_name_today_size">14sp</dimen>
+    <dimen name="day_date_size">11sp</dimen>
+    <dimen name="day_date_today_size">11.5sp</dimen>
+    
+    <dimen name="cell_padding_horizontal">8dp</dimen>
+    <dimen name="cell_padding_vertical">4dp</dimen>
+    <dimen name="cell_subject_size">14sp</dimen>
+    <dimen name="cell_room_size">10sp</dimen>
+    <dimen name="cell_teacher_size">11sp</dimen>
+    <dimen name="cell_empty_text_size">13sp</dimen>
+    <dimen name="cell_malica_text_size">13sp</dimen>
+    
+    <dimen name="nav_button_size">36dp</dimen>
+    <dimen name="nav_button_padding">6dp</dimen>
+    
+    <dimen name="card_corner_radius">20dp</dimen>
+    
+    <dimen name="fab_size">56dp</dimen>
+    <dimen name="fab_margin">20dp</dimen>
+    <dimen name="fab_padding">14dp</dimen>
+</resources>

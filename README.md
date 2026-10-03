@@ -9,26 +9,33 @@ Android aplikacija za hiter pregled šolskega urnika iz sistema eAsistent. Aplik
 - **3-dnevni pogled** -- privzeti pogled, ki prikazuje urnik za prejšnji, trenutni in naslednji dan v treh vertikalnih stolpcih. Trenutni dan je poudarjen, stranska dneva pa zatemljena z gradientom proti robovom zaslona.
 - **Tedenski tabelarni pogled** -- alternativni pogled, ki prikazuje celoten tedenski urnik v horizontalno drsljivi tabeli. Dostopen preko menija.
 
-### Spremljanje v realnem casu
+### Navigacija med tedni in dnevi
 
-- Samodejno oznacevanje trenutne solske ure (mocna modra oznaka).
-- Oznacevanje naslednje ure med odmorom (sibkejsa vijolicna oznaka).
-- Vizualno razlocevanje preteklih in prihodnjih ur.
+- **Prejšnji in naslednji teden** -- puščici ob oznaki tedna omogočata hiter prehod med preteklimi in prihodnjimi tedni prek uradnega AJAX vmesnika eAsistent.
+- **Izbira tedna** -- klik na oznako tedna ali meni odpre izbirnik vseh tednov v šolskem letu (od 1 do 53).
+- **Zvezno drsenje** -- podrs preko ponedeljka ali petka samodejno odpre ustrezen sosednji teden.
+- **Gumb Danes** -- ponastavi pogled na trenutni dan in tekoči teden.
+
+### Prilagajanje zaslonom
+
+- Celostna odzivnost z namenskimi dimenzijami (`values`, `values-sw320dp`, `values-sw400dp`), ki zagotavljajo čitljivost in pravilna razmerja na različno velikih napravah ter razmerjih stranic.
+
+### Spremljanje v realnem casu in casovni pas
+
+- Čas in datumi so fiksirani na slovenski časovni pas (`Europe/Ljubljana`).
+- Samodejno označevanje trenutne šolske ure (modra poudaritev).
+- Označevanje naslednje ure med odmorom (vijolična poudaritev).
+- Vizualno razločevanje preteklih in prihodnjih ur ter malice.
 
 ### Lokalno shranjevanje
 
-Urnik se ob osvezitvi shrani lokalno. Ob ponovnem zagonu aplikacije se prikazejo shranjeni podatki brez cakanja na omrezje. Osvezitev se sprozi izkljucno rocno s pritiskom na gumb.
-
-### Navigacija
-
-- Navigacijske puscice ali vodoravno drsenje za premikanje med dnevi.
-- Gumb za takojsen skok na trenutni dan.
+Urnik se ob osvežitvi shrani lokalno v pomnilnik naprave. Ob ponovnem zagonu se naloži takoj brez internetne povezave.
 
 ### Nastavitve
 
-- Temni in svetli nacin (Material 3).
-- Premik gumba za osvezitev na levo ali desno stran zaslona.
-- Nastavitev URL povezave do urnika.
+- Temni in svetli način (Material 3).
+- Premik plavajočega gumba za osvežitev (levo ali desno).
+- Nastavitev lastne URL povezave do eAsistent urnika.
 
 ## Tehnicne podrobnosti
 
@@ -37,7 +44,8 @@ Urnik se ob osvezitvi shrani lokalno. Ob ponovnem zagonu aplikacije se prikazejo
 | Jezik                 | Java 11             |
 | Min SDK               | 24 (Android 7.0)    |
 | Target SDK            | 37                  |
-| Razclenjanje HTML     | jsoup 1.23.2        |
+| Časovni pas           | Europe/Ljubljana    |
+| Razčlenjanje HTML     | jsoup 1.23.2        |
 | Oblikovni sistem      | Material Design 3   |
 | Shranjevanje podatkov | SharedPreferences + notranji pomnilnik |
 
@@ -45,27 +53,27 @@ Urnik se ob osvezitvi shrani lokalno. Ob ponovnem zagonu aplikacije se prikazejo
 
 ```
 com.example.eassistent
-├── MainActivity.java        # Glavna aktivnost, pogledi, navigacija
+├── MainActivity.java        # Glavna aktivnost, navigacija, odzivni pogledi
 ├── data/
-│   └── UrnikStorage.java    # Lokalno shranjevanje urnika in nastavitev
+│   └── UrnikStorage.java    # Lokalna hramba urnika in uporabniških nastavitev
 ├── model/
-│   ├── ScheduleData.java    # Podatkovni model celotnega urnika
-│   ├── DaySchedule.java     # Model posameznega dne
-│   ├── PeriodSchedule.java  # Model posamezne solske ure
-│   └── ClassItem.java       # Model posameznega predmeta
+│   ├── ScheduleData.java    # Podatkovni model urnika (tedni, metapodatki)
+│   ├── DaySchedule.java     # Model posameznega šolskega dne
+│   ├── PeriodSchedule.java  # Model posamezne šolske ure
+│   └── ClassItem.java       # Model predmeta, profesorja in učilnice
 ├── network/
-│   └── UrnikFetcher.java    # HTTP zahteva z laznim brskalniskim profilom
+│   └── UrnikFetcher.java    # HTTP odjemalec in AJAX nalaganje tednov
 └── parser/
-    └── UrnikParser.java     # Razclenjanje HTML urnika z jsoup
+    └── UrnikParser.java     # Razčlenjanje celotnega HTML in AJAX odzivov
 ```
 
 ## Namestitev
 
 ### Iz izdaje (Release)
 
-Prenesite najnovejso APK datoteko s strani [GitHub Releases](https://github.com/alentrost/eASSistent/releases).
+Prenesite najnovejšo APK datoteko s strani [GitHub Releases](https://github.com/alentrost/eASSistent/releases).
 
-Za namestitev APK datoteke na Android napravi omogocite namestitev aplikacij iz neznanih virov.
+Za namestitev APK datoteke na Android napravi omogočite namestitev aplikacij iz neznanih virov.
 
 ### Iz izvorne kode
 
@@ -79,9 +87,10 @@ Zgrajena APK datoteka se nahaja v `app/build/outputs/apk/debug/`.
 
 ## Uporaba
 
-1. Ob prvem zagonu vnesite URL povezavo do vasega urnika na eAsistent (oblika: `https://urniki.easistent.com/urniki/.../oddelki/.../dijak/...`).
-2. Pritisnite gumb za osvezitev, da prenesete urnik.
-3. Urnik se shrani lokalno in je ob naslednjem zagonu takoj na voljo.
+1. Ob prvem zagonu vnesite URL povezavo do vašega urnika na eAsistent (oblika: `https://urniki.easistent.com/urniki/.../oddelki/.../dijak/...` ali `.../razredi/.../dijak/...`).
+2. Pritisnite gumb za osvežitev, da prenesete urnik.
+3. Za prehod med tedni uporabite navigacijski puščici `<` in `>` ob nazivu tedna ali izberite želeni teden v meniju.
+4. Urnik se shrani lokalno in je ob naslednjem zagonu takoj na voljo.
 
 ## Licenca
 

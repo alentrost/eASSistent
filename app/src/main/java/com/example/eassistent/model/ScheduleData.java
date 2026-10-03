@@ -17,6 +17,9 @@ public class ScheduleData implements Serializable {
     private List<DaySchedule> days;
     private List<String> hourNames;
     private List<String> hourTimes;
+    private int currentWeekNumber;
+    private int totalWeeks;
+    private int idSola;
 
     public ScheduleData() {
         this.schoolTitle = "";
@@ -95,6 +98,13 @@ public class ScheduleData implements Serializable {
         this.hourTimes = hourTimes;
     }
 
+    public int getCurrentWeekNumber() { return currentWeekNumber; }
+    public void setCurrentWeekNumber(int currentWeekNumber) { this.currentWeekNumber = currentWeekNumber; }
+    public int getTotalWeeks() { return totalWeeks; }
+    public void setTotalWeeks(int totalWeeks) { this.totalWeeks = totalWeeks; }
+    public int getIdSola() { return idSola; }
+    public void setIdSola(int idSola) { this.idSola = idSola; }
+
     public String toJsonString() throws JSONException {
         JSONObject json = new JSONObject();
         json.put("schoolTitle", schoolTitle);
@@ -102,6 +112,9 @@ public class ScheduleData implements Serializable {
         json.put("weekText", weekText);
         json.put("lastUpdatedMillis", lastUpdatedMillis);
         json.put("sourceUrl", sourceUrl);
+        json.put("currentWeekNumber", currentWeekNumber);
+        json.put("totalWeeks", totalWeeks);
+        json.put("idSola", idSola);
 
         JSONArray daysArr = new JSONArray();
         for (DaySchedule d : days) {
@@ -134,6 +147,9 @@ public class ScheduleData implements Serializable {
             data.setWeekText(json.optString("weekText", ""));
             data.setLastUpdatedMillis(json.optLong("lastUpdatedMillis", 0));
             data.setSourceUrl(json.optString("sourceUrl", ""));
+            data.setCurrentWeekNumber(json.optInt("currentWeekNumber", 0));
+            data.setTotalWeeks(json.optInt("totalWeeks", 0));
+            data.setIdSola(json.optInt("idSola", 0));
 
             JSONArray daysArr = json.optJSONArray("days");
             if (daysArr != null) {

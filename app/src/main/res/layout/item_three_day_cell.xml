@@ -6,10 +6,10 @@
     android:background="@android:color/transparent"
     android:gravity="center_vertical"
     android:orientation="vertical"
-    android:paddingStart="6dp"
-    android:paddingTop="3dp"
-    android:paddingEnd="6dp"
-    android:paddingBottom="3dp">
+    android:paddingStart="@dimen/cell_padding_horizontal"
+    android:paddingTop="@dimen/cell_padding_vertical"
+    android:paddingEnd="@dimen/cell_padding_horizontal"
+    android:paddingBottom="@dimen/cell_padding_vertical">
 
     <!-- Container for class items inside this cell -->
     <LinearLayout
@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:text="—"
             android:textColor="@color/ea_text_muted"
-            android:textSize="12sp" />
+            android:textSize="@dimen/cell_empty_text_size" />
 
     </LinearLayout>
 
@@ -52,7 +52,7 @@
             android:layout_height="wrap_content"
             android:text="🍽️ Malica"
             android:textColor="@color/ea_malica_text"
-            android:textSize="11.5sp"
+            android:textSize="@dimen/cell_malica_text_size"
             android:textStyle="bold" />
 
     </LinearLayout>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Header -->
+    <dimen name="header_class_name_size">17sp</dimen>
+    <dimen name="header_school_title_size">11sp</dimen>
+    <dimen name="header_week_badge_size">10.5sp</dimen>
+    <dimen name="header_last_updated_size">10sp</dimen>
+    <dimen name="header_jump_today_size">10.5sp</dimen>
+    <dimen name="header_padding_horizontal">12dp</dimen>
+    <dimen name="header_padding_vertical">8dp</dimen>
+    
+    <!-- Day column headers -->
+    <dimen name="day_badge_size">9sp</dimen>
+    <dimen name="day_name_size">12sp</dimen>
+    <dimen name="day_name_today_size">13sp</dimen>
+    <dimen name="day_date_size">10sp</dimen>
+    <dimen name="day_date_today_size">10.5sp</dimen>
+    
+    <!-- Three-day cell -->
+    <dimen name="cell_padding_horizontal">6dp</dimen>
+    <dimen name="cell_padding_vertical">3dp</dimen>
+    <dimen name="cell_subject_size">12.5sp</dimen>
+    <dimen name="cell_room_size">9sp</dimen>
+    <dimen name="cell_teacher_size">10sp</dimen>
+    <dimen name="cell_empty_text_size">12sp</dimen>
+    <dimen name="cell_malica_text_size">11.5sp</dimen>
+    
+    <!-- Nav buttons -->
+    <dimen name="nav_button_size">32dp</dimen>
+    <dimen name="nav_button_padding">5dp</dimen>
+    
+    <!-- Card corner radius -->
+    <dimen name="card_corner_radius">16dp</dimen>
+    
+    <!-- Refresh FAB -->
+    <dimen name="fab_size">52dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+    <dimen name="fab_padding">13dp</dimen>
+</resources>

@@ -58,6 +58,49 @@ public class UrnikParser {
         }
         schedule.setWeekText(weekText);
 
+        // Extract current week number from JavaScript: var teden = '5';
+        int currentWeek = 0;
+        int totalWeeks = 0;
+        String htmlLower = html.toLowerCase();
+        int tedenVarIdx = html.indexOf("var teden = '");
+        if (tedenVarIdx != -1) {
+            int startIdx = tedenVarIdx + 13; // length of "var teden = '"
+            int endIdx = html.indexOf("'", startIdx);
+            if (endIdx != -1) {
+                try {
+                    currentWeek = Integer.parseInt(html.substring(startIdx, endIdx).trim());
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        
+        // Count total weeks from dropdown
+        Elements weekItems = doc.select("#tedni-toggle-list a[data-teden]");
+        if (!weekItems.isEmpty()) {
+            totalWeeks = weekItems.size();
+        } else {
+            totalWeeks = 53; // default school year
+        }
+        
+        schedule.setCurrentWeekNumber(currentWeek);
+        schedule.setTotalWeeks(totalWeeks);
+
+        // Extract id_sola from JavaScript: id_sola = '224' or var id_sola = '224'
+        int idSola = 0;
+        int idSolaIdx = html.indexOf("id_sola");
+        if (idSolaIdx != -1) {
+            // Find the next number after id_sola
+            int eqIdx = html.indexOf("'", idSolaIdx);
+            if (eqIdx != -1) {
+                int endQuote = html.indexOf("'", eqIdx + 1);
+                if (endQuote != -1) {
+                    try {
+                        idSola = Integer.parseInt(html.substring(eqIdx + 1, endQuote).trim());
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        schedule.setIdSola(idSola);
+
         // 4. Day Headers
         Elements dayHeaders = doc.select("table.ednevnik-seznam_ur_teden thead tr th");
         List<DaySchedule> days = new ArrayList<>();
@@ -129,6 +172,115 @@ public class UrnikParser {
         schedule.setHourNames(hourNames);
         schedule.setHourTimes(hourTimes);
 
+        return schedule;
+    }
+
+    /**
+     * Parses the AJAX response for a specific week.
+     * The AJAX response fields are separated by Unit Separator (\u001f):
+     * [0]=weekNumber, [1]=startDate, [2]=endDate, [3]=scheduleHTML, [4]=qversion
+     */
+    public static ScheduleData parseAjaxWeek(String ajaxResponse, String sourceUrl, ScheduleData baseData) {
+        if (ajaxResponse == null || ajaxResponse.trim().isEmpty()) return null;
+        
+        String[] parts = ajaxResponse.split("\u001f");
+        if (parts.length < 4) return null;
+        
+        String weekNumStr = parts[0].trim();
+        String startDate = parts[1].trim();
+        String endDate = parts[2].trim();
+        String tableHtml = parts[3];
+        
+        // Wrap the HTML in a minimal document so jsoup can parse it
+        String wrappedHtml = tableHtml.contains("<table") ?
+                "<html><body>" + tableHtml + "</body></html>" :
+                "<html><body><table class='ednevnik-seznam_ur_teden'>" + tableHtml + "</table></body></html>";
+        
+        Document doc = Jsoup.parse(wrappedHtml);
+        ScheduleData schedule = new ScheduleData();
+        schedule.setSourceUrl(sourceUrl != null ? sourceUrl : "");
+        schedule.setLastUpdatedMillis(System.currentTimeMillis());
+        
+        // Copy metadata from base data if available
+        if (baseData != null) {
+            schedule.setSchoolTitle(baseData.getSchoolTitle());
+            schedule.setClassName(baseData.getClassName());
+            schedule.setTotalWeeks(baseData.getTotalWeeks());
+            schedule.setIdSola(baseData.getIdSola());
+        }
+        
+        int weekNum = 0;
+        try { weekNum = Integer.parseInt(weekNumStr); } catch (NumberFormatException ignored) {}
+        schedule.setCurrentWeekNumber(weekNum);
+        schedule.setWeekText("Teden " + weekNum + ": " + startDate + " - " + endDate);
+        
+        // Parse day headers
+        Elements dayHeaders = doc.select("table.ednevnik-seznam_ur_teden thead tr th");
+        List<DaySchedule> days = new ArrayList<>();
+        for (int i = 1; i < dayHeaders.size() && i <= 5; i++) {
+            Element th = dayHeaders.get(i);
+            String dayName = th.select(".days").text().trim();
+            String dateText = th.select(".date").text().trim();
+            boolean isToday = th.hasClass("ednevnik-seznam_ur_teden-td-danes");
+            DaySchedule day = new DaySchedule(i - 1, dayName, dateText, isToday);
+            days.add(day);
+        }
+        
+        if (days.isEmpty()) {
+            String[] defaultDays = {"Ponedeljek", "Torek", "Sreda", "Četrtek", "Petek"};
+            for (int i = 0; i < defaultDays.length; i++) {
+                days.add(new DaySchedule(i, defaultDays[i], "", false));
+            }
+        }
+        
+        // Parse hour rows
+        Elements rows = doc.select("table.ednevnik-seznam_ur_teden tbody tr");
+        List<String> hourNames = new ArrayList<>();
+        List<String> hourTimes = new ArrayList<>();
+        
+        int hourIdx = 0;
+        for (Element row : rows) {
+            Element th = row.selectFirst("th");
+            if (th == null) continue;
+            
+            String hourName = th.select(".naziv-ure").text().trim();
+            String hourTime = th.select(".potek-ure").text().trim();
+            if (hourName.isEmpty()) continue;
+            
+            hourNames.add(hourName);
+            hourTimes.add(hourTime);
+            
+            Elements cells = row.select("td.ednevnik-seznam_ur_teden-td");
+            for (int d = 0; d < days.size() && d < cells.size(); d++) {
+                Element cell = cells.get(d);
+                DaySchedule day = days.get(d);
+                
+                if (cell.hasClass("ednevnik-seznam_ur_teden-td-danes")) {
+                    day.setToday(true);
+                }
+                
+                PeriodSchedule period = new PeriodSchedule(hourIdx, hourName, hourTime);
+                
+                Element srSpan = cell.selectFirst(".public-urnik-sr-only");
+                String srText = srSpan != null ? srSpan.text().trim() : "";
+                
+                Elements blocks = cell.select(".ednevnik-seznam_ur_teden-blok-wrap");
+                for (Element block : blocks) {
+                    ClassItem item = parseBlock(block, srText);
+                    period.addItem(item);
+                }
+                
+                day.addPeriod(period);
+            }
+            hourIdx++;
+        }
+        
+        for (DaySchedule day : days) {
+            schedule.addDay(day);
+        }
+        schedule.setHourNames(hourNames);
+        schedule.setHourTimes(hourTimes);
+        
         return schedule;
     }
 

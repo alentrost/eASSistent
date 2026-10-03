@@ -21,7 +21,7 @@
             android:maxLines="1"
             android:text="MAT"
             android:textColor="@color/ea_text_primary"
-            android:textSize="12.5sp"
+            android:textSize="@dimen/cell_subject_size"
             android:textStyle="bold" />
 
         <!-- Classroom (e.g. E19, E32) -->
@@ -37,7 +37,7 @@
             android:paddingBottom="1dp"
             android:text="E19"
             android:textColor="@color/ea_blue_dark"
-            android:textSize="9sp"
+            android:textSize="@dimen/cell_room_size"
             android:textStyle="bold"
             android:visibility="gone" />
 
@@ -53,7 +53,7 @@
         android:maxLines="1"
         android:text="B. Vouk"
         android:textColor="@color/ea_text_secondary"
-        android:textSize="10sp"
+        android:textSize="@dimen/cell_teacher_size"
         android:visibility="gone" />
 
 </LinearLayout>

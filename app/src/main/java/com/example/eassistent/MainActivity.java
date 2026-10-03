@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -69,6 +70,8 @@ public class MainActivity extends AppCompatActivity {
     // Action Buttons
     private ImageButton btnPrevDay;
     private ImageButton btnNextDay;
+    private ImageButton btnPrevWeek;
+    private ImageButton btnNextWeek;
     private ImageButton btnMenu;
     private FrameLayout fabRefreshContainer;
     private ImageButton btnRefresh;
@@ -110,9 +113,11 @@ public class MainActivity extends AppCompatActivity {
     private int focusedDayIndex = 0;
     private boolean isTableView = false; // Primary default view is 3-Day Focus View
     private GestureDetector gestureDetector;
+    private int currentWeekOffset = 0; // 0 = current week, -1 = previous, +1 = next
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final TimeZone TZ_SLOVENIA = TimeZone.getTimeZone("Europe/Ljubljana");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -151,6 +156,8 @@ public class MainActivity extends AppCompatActivity {
 
         btnPrevDay = findViewById(R.id.btnPrevDay);
         btnNextDay = findViewById(R.id.btnNextDay);
+        btnPrevWeek = findViewById(R.id.btnPrevWeek);
+        btnNextWeek = findViewById(R.id.btnNextWeek);
         btnMenu = findViewById(R.id.btnMenu);
         fabRefreshContainer = findViewById(R.id.fabRefreshContainer);
         btnRefresh = findViewById(R.id.btnRefresh);
@@ -240,6 +247,12 @@ public class MainActivity extends AppCompatActivity {
             if (newIndex >= 0 && newIndex < currentSchedule.getDays().size()) {
                 focusedDayIndex = newIndex;
                 renderThreeDayView(currentSchedule, focusedDayIndex);
+            } else if (newIndex < 0) {
+                // Swiping past Monday -> go to previous week Friday
+                navigateWeek(-1, currentSchedule.getDays().size() - 1);
+            } else {
+                // Swiping past Friday -> go to next week Monday
+                navigateWeek(1, 0);
             }
         }
     }
@@ -252,10 +265,31 @@ public class MainActivity extends AppCompatActivity {
         btnPrevDay.setOnClickListener(v -> navigateDay(-1));
         btnNextDay.setOnClickListener(v -> navigateDay(1));
 
+        if (btnPrevWeek != null) {
+            btnPrevWeek.setOnClickListener(v -> navigateWeek(-1, -1));
+        }
+        if (btnNextWeek != null) {
+            btnNextWeek.setOnClickListener(v -> navigateWeek(1, -1));
+        }
+        if (tvWeekName != null) {
+            tvWeekName.setOnClickListener(v -> showWeekPickerDialog());
+        }
+
         btnJumpToday.setOnClickListener(v -> {
             if (currentSchedule != null) {
-                focusedDayIndex = getTodayDayIndex(currentSchedule);
-                renderThreeDayView(currentSchedule, focusedDayIndex);
+                boolean hasTodayInCurrentWeek = false;
+                for (DaySchedule d : currentSchedule.getDays()) {
+                    if (d.isToday()) {
+                        hasTodayInCurrentWeek = true;
+                        break;
+                    }
+                }
+                if (hasTodayInCurrentWeek) {
+                    focusedDayIndex = getTodayDayIndex(currentSchedule);
+                    renderThreeDayView(currentSchedule, focusedDayIndex);
+                } else {
+                    refreshScheduleFromNetwork();
+                }
             }
         });
 
@@ -266,7 +300,10 @@ public class MainActivity extends AppCompatActivity {
     private void showPopupMenu(View anchor) {
         PopupMenu popup = new PopupMenu(this, anchor);
         popup.getMenu().add(0, 1, 0, isTableView ? "3-dnevni pogled" : "Tedenska tabela");
-        popup.getMenu().add(0, 2, 1, "Nastavitve");
+        popup.getMenu().add(0, 3, 1, "Prejšnji teden");
+        popup.getMenu().add(0, 4, 2, "Naslednji teden");
+        popup.getMenu().add(0, 5, 3, "Izberi teden...");
+        popup.getMenu().add(0, 2, 4, "Nastavitve");
         popup.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 toggleViewMode();
@@ -274,10 +311,103 @@ public class MainActivity extends AppCompatActivity {
             } else if (item.getItemId() == 2) {
                 showSettingsDialog();
                 return true;
+            } else if (item.getItemId() == 3) {
+                navigateWeek(-1, -1);
+                return true;
+            } else if (item.getItemId() == 4) {
+                navigateWeek(1, -1);
+                return true;
+            } else if (item.getItemId() == 5) {
+                showWeekPickerDialog();
+                return true;
             }
             return false;
         });
         popup.show();
+    }
+
+    private void showWeekPickerDialog() {
+        if (currentSchedule == null) return;
+        int total = currentSchedule.getTotalWeeks() > 0 ? currentSchedule.getTotalWeeks() : 53;
+        int cur = currentSchedule.getCurrentWeekNumber() > 0 ? currentSchedule.getCurrentWeekNumber() : 5;
+        
+        String[] weekOptions = new String[total];
+        int selectedIndex = 0;
+        for (int i = 0; i < total; i++) {
+            int w = i + 1;
+            weekOptions[i] = "Teden " + w + (w == cur ? " (trenutno)" : "");
+            if (w == cur) selectedIndex = i;
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Izbira tedna")
+                .setSingleChoiceItems(weekOptions, selectedIndex, (dialog, which) -> {
+                    dialog.dismiss();
+                    int targetWeek = which + 1;
+                    if (targetWeek != cur) {
+                        fetchWeek(targetWeek, -1);
+                    }
+                })
+                .setNegativeButton("Prekliči", null)
+                .show();
+    }
+
+    private void navigateWeek(int delta, int targetDayIndex) {
+        if (currentSchedule == null) return;
+        int currentWeek = currentSchedule.getCurrentWeekNumber();
+        if (currentWeek <= 0) currentWeek = 5; // Fallback default
+        int targetWeek = currentWeek + delta;
+        if (targetWeek < 1) return;
+        if (currentSchedule.getTotalWeeks() > 0 && targetWeek > currentSchedule.getTotalWeeks()) return;
+        
+        fetchWeek(targetWeek, targetDayIndex);
+    }
+    
+    private void fetchWeek(int weekNumber, int targetDayIndex) {
+        if (currentSchedule == null) return;
+        final String baseUrl = UrnikStorage.getSavedUrl(this);
+        int idSola = currentSchedule.getIdSola();
+        if (idSola == 0) {
+            idSola = 224; // Default fallback for Šolski center Nova Gorica
+        }
+        
+        final String ajaxUrl = UrnikFetcher.buildAjaxWeekUrl(baseUrl, idSola, weekNumber);
+        if (ajaxUrl == null) return;
+        
+        pbLoading.setVisibility(View.VISIBLE);
+        btnRefresh.setVisibility(View.GONE);
+        
+        final ScheduleData baseData = currentSchedule;
+        
+        executor.execute(() -> {
+            try {
+                String response = UrnikFetcher.fetchWeekAjaxSync(ajaxUrl);
+                ScheduleData weekSchedule = UrnikParser.parseAjaxWeek(response, baseUrl, baseData);
+                
+                if (weekSchedule != null && !weekSchedule.getDays().isEmpty()) {
+                    UrnikStorage.saveSchedule(MainActivity.this, weekSchedule);
+                    
+                    mainHandler.post(() -> {
+                        pbLoading.setVisibility(View.GONE);
+                        btnRefresh.setVisibility(View.VISIBLE);
+                        displaySchedule(weekSchedule);
+                        if (targetDayIndex >= 0 && targetDayIndex < weekSchedule.getDays().size()) {
+                            focusedDayIndex = targetDayIndex;
+                            if (!isTableView) {
+                                renderThreeDayView(weekSchedule, focusedDayIndex);
+                            }
+                        }
+                    });
+                } else {
+                    throw new Exception("Podatkov o urniku ni bilo mogoče prebrati.");
+                }
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    pbLoading.setVisibility(View.GONE);
+                    btnRefresh.setVisibility(View.VISIBLE);
+                });
+            }
+        });
     }
 
     private void toggleViewMode() {
@@ -334,6 +464,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (data.getLastUpdatedMillis() > 0) {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            sdf.setTimeZone(TZ_SLOVENIA);
             tvLastUpdated.setText(sdf.format(new Date(data.getLastUpdatedMillis())));
         } else {
             tvLastUpdated.setText("--:--");
@@ -358,16 +489,36 @@ public class MainActivity extends AppCompatActivity {
 
     private int getTodayDayIndex(ScheduleData data) {
         if (data == null || data.getDays().isEmpty()) return 0;
+        
+        // 1. Check if parser marked any day as today
         for (int i = 0; i < data.getDays().size(); i++) {
             if (data.getDays().get(i).isToday()) {
                 return i;
             }
         }
-        // Fallback by Calendar DAY_OF_WEEK (MONDAY = 0)
-        int dow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK);
+        
+        // 2. Match by current date in Slovenia timezone (e.g. "1. 10.")
+        SimpleDateFormat daySdf = new SimpleDateFormat("d. M.", Locale.getDefault());
+        daySdf.setTimeZone(TZ_SLOVENIA);
+        String todayDateStr = daySdf.format(new Date());
+        for (int i = 0; i < data.getDays().size(); i++) {
+            String dateText = data.getDays().get(i).getDateText();
+            if (dateText != null && dateText.trim().startsWith(todayDateStr)) {
+                return i;
+            }
+        }
+        
+        // 3. Fallback by Calendar DAY_OF_WEEK (MONDAY = 0)
+        Calendar cal = Calendar.getInstance(TZ_SLOVENIA);
+        int dow = cal.get(Calendar.DAY_OF_WEEK);
         int mapped = dow - Calendar.MONDAY;
         if (mapped >= 0 && mapped < data.getDays().size()) {
             return mapped;
+        }
+        
+        // Weekend: Saturday shows Friday, Sunday shows Monday
+        if (dow == Calendar.SATURDAY) {
+            return data.getDays().size() - 1;
         }
         return 0;
     }
@@ -388,10 +539,20 @@ public class MainActivity extends AppCompatActivity {
         DaySchedule yesterdayDay = centerIdx > 0 ? data.getDays().get(centerIdx - 1) : null;
         DaySchedule tomorrowDay = centerIdx < totalDays - 1 ? data.getDays().get(centerIdx + 1) : null;
 
+        boolean isActualToday = centerDay.isToday();
+        if (!isActualToday) {
+            SimpleDateFormat daySdf = new SimpleDateFormat("d. M.", Locale.getDefault());
+            daySdf.setTimeZone(TZ_SLOVENIA);
+            String todayDateStr = daySdf.format(new Date());
+            if (centerDay.getDateText() != null && centerDay.getDateText().trim().startsWith(todayDateStr)) {
+                isActualToday = true;
+            }
+        }
+
         // 1. Configure Header 1 (Yesterday)
         if (yesterdayDay != null) {
             llHeaderYesterday.setVisibility(View.VISIBLE);
-            tvHeaderYesterdayBadge.setText(centerIdx == getTodayDayIndex(data) ? "VČERAJ" : "PREJŠNJI DAN");
+            tvHeaderYesterdayBadge.setText(isActualToday ? "VČERAJ" : "PREJŠNJI DAN");
             tvHeaderYesterdayName.setText(yesterdayDay.getDayName());
             tvHeaderYesterdayDate.setText(yesterdayDay.getDateText());
             llHeaderYesterday.setAlpha(0.78f);
@@ -405,7 +566,6 @@ public class MainActivity extends AppCompatActivity {
 
         // 2. Configure Header 2 (Current Day - Highlighted!)
         llHeaderToday.setVisibility(View.VISIBLE);
-        boolean isActualToday = centerDay.isToday() || centerIdx == getTodayDayIndex(data);
         tvHeaderTodayBadge.setText(isActualToday ? "⭐ DANES" : "IZBRANI DAN");
         tvHeaderTodayName.setText(centerDay.getDayName());
         tvHeaderTodayDate.setText(centerDay.getDateText());
@@ -414,7 +574,7 @@ public class MainActivity extends AppCompatActivity {
         // 3. Configure Header 3 (Tomorrow)
         if (tomorrowDay != null) {
             llHeaderTomorrow.setVisibility(View.VISIBLE);
-            tvHeaderTomorrowBadge.setText(centerIdx == getTodayDayIndex(data) ? "JUTRI" : "NASLEDNJI DAN");
+            tvHeaderTomorrowBadge.setText(isActualToday ? "JUTRI" : "NASLEDNJI DAN");
             tvHeaderTomorrowName.setText(tomorrowDay.getDayName());
             tvHeaderTomorrowDate.setText(tomorrowDay.getDateText());
             llHeaderTomorrow.setAlpha(0.78f);
@@ -427,7 +587,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Determine active period and next period during break for the center day
-        Calendar now = Calendar.getInstance();
+        Calendar now = Calendar.getInstance(TZ_SLOVENIA);
         int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
 
         int activePeriodIdx = -1;
