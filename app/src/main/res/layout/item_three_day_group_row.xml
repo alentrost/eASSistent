@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="0.5dp"
+    android:paddingBottom="0.5dp">
+
+    <!-- Professor on the left (e.g. M. Ortar, B. Vouk) -->
+    <TextView
+        android:id="@+id/tvGroupTeacher"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="M. Ortar"
+        android:textColor="@color/ea_text_secondary"
+        android:textSize="@dimen/cell_teacher_size"
+        android:visibility="gone" />
+
+    <!-- Classroom badge on the right (e.g. B35, E19) -->
+    <TextView
+        android:id="@+id/tvGroupRoom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="3dp"
+        android:background="@drawable/bg_badge"
+        android:paddingStart="4dp"
+        android:paddingTop="0.5dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="0.5dp"
+        android:text="B35"
+        android:textColor="@color/ea_blue_dark"
+        android:textSize="@dimen/cell_room_size"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+</LinearLayout>

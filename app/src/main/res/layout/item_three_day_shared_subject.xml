@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:orientation="vertical">
+
+    <!-- Subject name on top -->
+    <TextView
+        android:id="@+id/tvSharedSubject"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Subject name"
+        android:textColor="@color/ea_text_primary"
+        android:textSize="@dimen/cell_subject_size"
+        android:textStyle="bold" />
+
+    <!-- Dashed divider line under Subject Name -->
+    <View
+        android:id="@+id/vSubjectDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1.5dp"
+        android:layout_marginTop="1.5dp"
+        android:layout_marginBottom="1.5dp"
+        android:background="@drawable/divider_class_group_dashed" />
+
+    <!-- Groups container (Professor on left, Classroom badge on right) -->
+    <LinearLayout
+        android:id="@+id/llSharedGroups"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+</LinearLayout>

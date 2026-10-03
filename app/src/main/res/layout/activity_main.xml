@@ -224,283 +224,545 @@
         android:textSize="15sp"
         android:visibility="gone" />
 
-    <!-- 1. THREE-DAY FOCUS VIEW (Main View) -->
-    <LinearLayout
-        android:id="@+id/layoutThreeDayView"
+    <!-- 1. THREE-DAY FOCUS VIEW WRAPPER (Smooth horizontally scrolling full week strip showing 3 days at a time) -->
+    <FrameLayout
+        android:id="@+id/flThreeDayWrapper"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
+        android:clipChildren="true"
+        android:clipToPadding="false"
         android:visibility="visible">
 
-        <!-- 3-Column Headers: Yesterday | Today | Tomorrow -->
-        <LinearLayout
+        <!-- Smooth horizontally scrolling full week strip -->
+        <HorizontalScrollView
+            android:id="@+id/hsvThreeDayView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_marginEnd="6dp"
-            android:layout_marginBottom="4dp"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:id="@+id/llThreeDayContentRoot"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <!-- 7-Column Headers: Spacer 0 | Mon 1 | Tue 2 | Wed 3 | Thu 4 | Fri 5 | Spacer 6 -->
+                <LinearLayout
+                    android:id="@+id/llThreeDayHeadersStrip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <!-- Col 0: Spacer Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader0"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Ni podatka"
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 1: Monday Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader1"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Ponedeljek"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="5. 10."
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 2: Tuesday Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader2"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Torek"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="6. 10."
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 3: Wednesday Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader3"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Sreda"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="7. 10."
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 4: Thursday Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader4"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge4"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName4"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Četrtek"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate4"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="8. 10."
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 5: Friday Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader5"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge5"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName5"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Petek"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate5"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="9. 10."
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                    <!-- Col 6: Spacer Header -->
+                    <LinearLayout
+                        android:id="@+id/llHeader6"
+                        android:layout_width="120dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        android:background="@drawable/bg_header_dimmed"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/tvHeaderBadge6"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐ DANES"
+                            android:textColor="@color/ea_blue"
+                            android:textSize="@dimen/day_badge_size"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderName6"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="—"
+                            android:textColor="@color/ea_text_primary"
+                            android:textSize="@dimen/day_name_size"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvHeaderDate6"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Ni podatka"
+                            android:textColor="@color/ea_text_secondary"
+                            android:textSize="@dimen/day_date_size" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- 7-Column Cards Strip -->
+                <LinearLayout
+                    android:id="@+id/llThreeDayCardsStrip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal">
+
+                    <!-- Card 0: Spacer -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol0"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_dimmed_bg"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol0"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 1: Monday -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol1"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_surface"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol1"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 2: Tuesday -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol2"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_surface"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol2"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 3: Wednesday -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol3"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_surface"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol3"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 4: Thursday -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol4"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_surface"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol4"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 5: Friday -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol5"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_surface"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol5"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Card 6: Spacer -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardCol6"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="3.5dp"
+                        android:layout_marginEnd="3.5dp"
+                        app:cardBackgroundColor="@color/ea_dimmed_bg"
+                        app:cardCornerRadius="@dimen/card_corner_radius"
+                        app:cardElevation="0dp"
+                        app:cardPreventCornerOverlap="false"
+                        app:strokeColor="@color/ea_card_border"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:id="@+id/llCol6"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </HorizontalScrollView>
+
+        <!-- Gradient Overlays: fading to the left and right edges of the screen -->
+        <LinearLayout
+            android:id="@+id/llGradientOverlays"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:baselineAligned="false"
+            android:clickable="false"
+            android:focusable="false"
             android:orientation="horizontal"
             android:weightSum="3">
 
-            <!-- Column 1 Header: Yesterday -->
-            <LinearLayout
-                android:id="@+id/llHeaderYesterday"
+            <!-- Left Column edge gradient -->
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="2dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:background="@drawable/bg_header_dimmed"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp">
+                android:background="@drawable/bg_gradient_edge_left"
+                android:clickable="false"
+                android:focusable="false" />
 
-                <TextView
-                    android:id="@+id/tvHeaderYesterdayBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="VČERAJ"
-                    android:textColor="@color/ea_dimmed_text"
-                    android:textSize="@dimen/day_badge_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderYesterdayName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Sreda"
-                    android:textColor="@color/ea_text_primary"
-                    android:textSize="@dimen/day_name_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderYesterdayDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="30. 9."
-                    android:textColor="@color/ea_text_secondary"
-                    android:textSize="@dimen/day_date_size" />
-
-            </LinearLayout>
-
-            <!-- Column 2 Header: Today (Highlighted!) -->
-            <LinearLayout
-                android:id="@+id/llHeaderToday"
+            <!-- Center Column: transparent (no gradient) -->
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="1dp"
-                android:layout_marginEnd="1dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:background="@drawable/bg_header_today"
-                android:elevation="1dp"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp">
+                android:background="@android:color/transparent"
+                android:clickable="false"
+                android:focusable="false" />
 
-                <TextView
-                    android:id="@+id/tvHeaderTodayBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⭐ DANES"
-                    android:textColor="@color/ea_blue"
-                    android:textSize="@dimen/day_badge_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderTodayName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Četrtek"
-                    android:textColor="@color/ea_blue_dark"
-                    android:textSize="@dimen/day_name_today_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderTodayDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="1. 10."
-                    android:textColor="@color/ea_text_secondary"
-                    android:textSize="@dimen/day_date_today_size" />
-
-            </LinearLayout>
-
-            <!-- Column 3 Header: Tomorrow -->
-            <LinearLayout
-                android:id="@+id/llHeaderTomorrow"
+            <!-- Right Column edge gradient -->
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:background="@drawable/bg_header_dimmed"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp">
-
-                <TextView
-                    android:id="@+id/tvHeaderTomorrowBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="JUTRI"
-                    android:textColor="@color/ea_dimmed_text"
-                    android:textSize="@dimen/day_badge_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderTomorrowName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Petek"
-                    android:textColor="@color/ea_text_primary"
-                    android:textSize="@dimen/day_name_size"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHeaderTomorrowDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="2. 10."
-                    android:textColor="@color/ea_text_secondary"
-                    android:textSize="@dimen/day_date_size" />
-
-            </LinearLayout>
+                android:background="@drawable/bg_gradient_edge_right"
+                android:clickable="false"
+                android:focusable="false" />
 
         </LinearLayout>
 
-        <!-- FrameLayout for content with Gradient Overlays -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginStart="6dp"
-            android:layout_marginEnd="6dp"
-            android:layout_marginBottom="4dp"
-            android:layout_weight="1">
-
-            <!-- 3 Columns (Rounded by Column!) -->
-            <LinearLayout
-                android:id="@+id/llThreeDayColumnsContainer"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:baselineAligned="false"
-                android:orientation="horizontal"
-                android:weightSum="3">
-
-                <!-- Column 1: Yesterday Card -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardYesterdayColumn"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="2dp"
-                    app:cardBackgroundColor="@color/ea_dimmed_bg"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
-                    app:cardElevation="0dp"
-                    app:cardPreventCornerOverlap="false"
-                    app:strokeColor="@color/ea_card_border"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:id="@+id/llYesterdayColumn"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical" />
-
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Column 2: Today Card (Highlighted!) -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardTodayColumn"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="1dp"
-                    android:layout_marginEnd="1dp"
-                    app:cardBackgroundColor="@color/ea_surface"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
-                    app:cardElevation="0dp"
-                    app:cardPreventCornerOverlap="false"
-                    app:strokeColor="@color/ea_today_border"
-                    app:strokeWidth="1.5dp">
-
-                    <LinearLayout
-                        android:id="@+id/llTodayColumn"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical" />
-
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Column 3: Tomorrow Card -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardTomorrowColumn"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginStart="2dp"
-                    app:cardBackgroundColor="@color/ea_dimmed_bg"
-                    app:cardCornerRadius="@dimen/card_corner_radius"
-                    app:cardElevation="0dp"
-                    app:cardPreventCornerOverlap="false"
-                    app:strokeColor="@color/ea_card_border"
-                    app:strokeWidth="1dp">
-
-                    <LinearLayout
-                        android:id="@+id/llTomorrowColumn"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical" />
-
-                </com.google.android.material.card.MaterialCardView>
-
-            </LinearLayout>
-
-            <!-- Gradient Overlays: fading to the left and right edges of the screen -->
-            <LinearLayout
-                android:id="@+id/llGradientOverlays"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:baselineAligned="false"
-                android:clickable="false"
-                android:focusable="false"
-                android:orientation="horizontal"
-                android:weightSum="3">
-
-                <!-- Left Column edge gradient -->
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_gradient_edge_left"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-                <!-- Center Column: transparent (no gradient) -->
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@android:color/transparent"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-                <!-- Right Column edge gradient -->
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_gradient_edge_right"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-            </LinearLayout>
-
-        </FrameLayout>
-
-    </LinearLayout>
+    </FrameLayout>
 
     <!-- 2. FULL WEEK TABLE VIEW (Accessible via Toggle Button) -->
     <LinearLayout

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/llWeekPickerItemRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="6dp"
+    android:layout_marginTop="1.5dp"
+    android:layout_marginEnd="6dp"
+    android:layout_marginBottom="1.5dp"
+    android:background="@drawable/bg_week_picker_unselected"
+    android:gravity="center_vertical"
+    android:minHeight="38dp"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="6dp">
+
+    <!-- Week Title (e.g. Teden 6) -->
+    <TextView
+        android:id="@+id/tvWeekTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="Teden 6"
+        android:textColor="@color/ea_text_primary"
+        android:textSize="13.5sp"
+        android:textStyle="bold" />
+
+    <!-- Badge indicating the current active week -->
+    <TextView
+        android:id="@+id/tvCurrentBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_badge"
+        android:paddingStart="5dp"
+        android:paddingTop="1dp"
+        android:paddingEnd="5dp"
+        android:paddingBottom="1dp"
+        android:text="trenutno"
+        android:textColor="@color/ea_blue_dark"
+        android:textSize="9.5sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Flexible space -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Date range on the right side -->
+    <TextView
+        android:id="@+id/tvWeekDateRange"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="5. 10. – 11. 10."
+        android:textColor="@color/ea_text_secondary"
+        android:textSize="12.5sp" />
+
+    <!-- Checkmark indicator when selected -->
+    <ImageView
+        android:id="@+id/ivCheck"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="Izbrano"
+        android:src="@drawable/ic_check"
+        android:visibility="gone"
+        app:tint="@color/ea_blue" />
+
+</LinearLayout>

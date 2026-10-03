@@ -1,5 +1,7 @@
 package com.example.eassistent;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -8,14 +10,23 @@ import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.Interpolator;
+import android.view.animation.OvershootInterpolator;
+import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.RadioButton;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -43,8 +54,10 @@ import com.example.eassistent.network.UrnikFetcher;
 import com.example.eassistent.parser.UrnikParser;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutorService;
@@ -77,31 +90,22 @@ public class MainActivity extends AppCompatActivity {
     private ImageButton btnRefresh;
     private ProgressBar pbLoading;
 
-    // 1. Three-Day Focus View
-    private LinearLayout layoutThreeDayView;
-    private LinearLayout llHeaderYesterday;
-    private TextView tvHeaderYesterdayBadge;
-    private TextView tvHeaderYesterdayName;
-    private TextView tvHeaderYesterdayDate;
-
-    private LinearLayout llHeaderToday;
-    private TextView tvHeaderTodayBadge;
-    private TextView tvHeaderTodayName;
-    private TextView tvHeaderTodayDate;
-
-    private LinearLayout llHeaderTomorrow;
-    private TextView tvHeaderTomorrowBadge;
-    private TextView tvHeaderTomorrowName;
-    private TextView tvHeaderTomorrowDate;
-
-    // 3 Columns (Rounded by Column!)
-    private MaterialCardView cardYesterdayColumn;
-    private LinearLayout llYesterdayColumn;
-    private MaterialCardView cardTodayColumn;
-    private LinearLayout llTodayColumn;
-    private MaterialCardView cardTomorrowColumn;
-    private LinearLayout llTomorrowColumn;
+    // 1. Three-Day Focus View (Smooth horizontally scrolling full week strip showing 3 days at a time)
+    private FrameLayout flThreeDayWrapper;
+    private HorizontalScrollView hsvThreeDayView;
+    private LinearLayout llThreeDayContentRoot;
+    private LinearLayout llThreeDayHeadersStrip;
+    private LinearLayout llThreeDayCardsStrip;
     private LinearLayout llGradientOverlays;
+
+    private final LinearLayout[] headerCols = new LinearLayout[7];
+    private final TextView[] headerBadges = new TextView[7];
+    private final TextView[] headerNames = new TextView[7];
+    private final TextView[] headerDates = new TextView[7];
+    private final MaterialCardView[] cardCols = new MaterialCardView[7];
+    private final LinearLayout[] columnLayouts = new LinearLayout[7];
+
+    private int columnWidth = 0;
 
     // 2. Full Week Table View
     private LinearLayout layoutTableView;
@@ -112,8 +116,11 @@ public class MainActivity extends AppCompatActivity {
     private ScheduleData currentSchedule;
     private int focusedDayIndex = 0;
     private boolean isTableView = false; // Primary default view is 3-Day Focus View
-    private GestureDetector gestureDetector;
     private int currentWeekOffset = 0; // 0 = current week, -1 = previous, +1 = next
+
+    private VelocityTracker velocityTracker;
+    private float startTouchX;
+    private float startTouchY;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -139,7 +146,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         initViews();
-        setupGestureDetector();
         setupListeners();
 
         // Load instantly from local storage (0ms delay)
@@ -165,36 +171,85 @@ public class MainActivity extends AppCompatActivity {
 
         updateRefreshButtonPosition();
 
-        // 3-Day Focus View
-        layoutThreeDayView = findViewById(R.id.layoutThreeDayView);
-        llHeaderYesterday = findViewById(R.id.llHeaderYesterday);
-        tvHeaderYesterdayBadge = findViewById(R.id.tvHeaderYesterdayBadge);
-        tvHeaderYesterdayName = findViewById(R.id.tvHeaderYesterdayName);
-        tvHeaderYesterdayDate = findViewById(R.id.tvHeaderYesterdayDate);
-
-        llHeaderToday = findViewById(R.id.llHeaderToday);
-        tvHeaderTodayBadge = findViewById(R.id.tvHeaderTodayBadge);
-        tvHeaderTodayName = findViewById(R.id.tvHeaderTodayName);
-        tvHeaderTodayDate = findViewById(R.id.tvHeaderTodayDate);
-
-        llHeaderTomorrow = findViewById(R.id.llHeaderTomorrow);
-        tvHeaderTomorrowBadge = findViewById(R.id.tvHeaderTomorrowBadge);
-        tvHeaderTomorrowName = findViewById(R.id.tvHeaderTomorrowName);
-        tvHeaderTomorrowDate = findViewById(R.id.tvHeaderTomorrowDate);
-
-        // 3 Column Cards (Rounded by Column!)
-        cardYesterdayColumn = findViewById(R.id.cardYesterdayColumn);
-        llYesterdayColumn = findViewById(R.id.llYesterdayColumn);
-        cardTodayColumn = findViewById(R.id.cardTodayColumn);
-        llTodayColumn = findViewById(R.id.llTodayColumn);
-        cardTomorrowColumn = findViewById(R.id.cardTomorrowColumn);
-        llTomorrowColumn = findViewById(R.id.llTomorrowColumn);
+        // 3-Day Focus View (7 columns: Spacer 0, Mon 1, Tue 2, Wed 3, Thu 4, Fri 5, Spacer 6)
+        flThreeDayWrapper = findViewById(R.id.flThreeDayWrapper);
+        hsvThreeDayView = findViewById(R.id.hsvThreeDayView);
+        llThreeDayContentRoot = findViewById(R.id.llThreeDayContentRoot);
+        llThreeDayHeadersStrip = findViewById(R.id.llThreeDayHeadersStrip);
+        llThreeDayCardsStrip = findViewById(R.id.llThreeDayCardsStrip);
         llGradientOverlays = findViewById(R.id.llGradientOverlays);
 
-        // Ensure gradient overlay lets touches pass through to scroll view underneath
+        headerCols[0] = findViewById(R.id.llHeader0);
+        headerCols[1] = findViewById(R.id.llHeader1);
+        headerCols[2] = findViewById(R.id.llHeader2);
+        headerCols[3] = findViewById(R.id.llHeader3);
+        headerCols[4] = findViewById(R.id.llHeader4);
+        headerCols[5] = findViewById(R.id.llHeader5);
+        headerCols[6] = findViewById(R.id.llHeader6);
+
+        headerBadges[0] = findViewById(R.id.tvHeaderBadge0);
+        headerBadges[1] = findViewById(R.id.tvHeaderBadge1);
+        headerBadges[2] = findViewById(R.id.tvHeaderBadge2);
+        headerBadges[3] = findViewById(R.id.tvHeaderBadge3);
+        headerBadges[4] = findViewById(R.id.tvHeaderBadge4);
+        headerBadges[5] = findViewById(R.id.tvHeaderBadge5);
+        headerBadges[6] = findViewById(R.id.tvHeaderBadge6);
+
+        headerNames[0] = findViewById(R.id.tvHeaderName0);
+        headerNames[1] = findViewById(R.id.tvHeaderName1);
+        headerNames[2] = findViewById(R.id.tvHeaderName2);
+        headerNames[3] = findViewById(R.id.tvHeaderName3);
+        headerNames[4] = findViewById(R.id.tvHeaderName4);
+        headerNames[5] = findViewById(R.id.tvHeaderName5);
+        headerNames[6] = findViewById(R.id.tvHeaderName6);
+
+        headerDates[0] = findViewById(R.id.tvHeaderDate0);
+        headerDates[1] = findViewById(R.id.tvHeaderDate1);
+        headerDates[2] = findViewById(R.id.tvHeaderDate2);
+        headerDates[3] = findViewById(R.id.tvHeaderDate3);
+        headerDates[4] = findViewById(R.id.tvHeaderDate4);
+        headerDates[5] = findViewById(R.id.tvHeaderDate5);
+        headerDates[6] = findViewById(R.id.tvHeaderDate6);
+
+        cardCols[0] = findViewById(R.id.cardCol0);
+        cardCols[1] = findViewById(R.id.cardCol1);
+        cardCols[2] = findViewById(R.id.cardCol2);
+        cardCols[3] = findViewById(R.id.cardCol3);
+        cardCols[4] = findViewById(R.id.cardCol4);
+        cardCols[5] = findViewById(R.id.cardCol5);
+        cardCols[6] = findViewById(R.id.cardCol6);
+
+        columnLayouts[0] = findViewById(R.id.llCol0);
+        columnLayouts[1] = findViewById(R.id.llCol1);
+        columnLayouts[2] = findViewById(R.id.llCol2);
+        columnLayouts[3] = findViewById(R.id.llCol3);
+        columnLayouts[4] = findViewById(R.id.llCol4);
+        columnLayouts[5] = findViewById(R.id.llCol5);
+        columnLayouts[6] = findViewById(R.id.llCol6);
+
+        for (int d = 0; d < 5; d++) {
+            final int dayIdx = d;
+            if (headerCols[d + 1] != null) {
+                headerCols[d + 1].setOnClickListener(v -> scrollToDay(dayIdx, true));
+            }
+            if (cardCols[d + 1] != null) {
+                cardCols[d + 1].setOnClickListener(v -> scrollToDay(dayIdx, true));
+            }
+        }
+
+        setupThreeDayScroll();
+
         if (llGradientOverlays != null) {
             llGradientOverlays.setOnTouchListener((v, event) -> false);
         }
+
+        flThreeDayWrapper.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            int w = flThreeDayWrapper.getWidth();
+            if (w > 0 && w / 3 != columnWidth) {
+                updateColumnWidths(w);
+                scrollToDay(focusedDayIndex, false);
+            }
+        });
 
         // Week Table View
         layoutTableView = findViewById(R.id.layoutTableView);
@@ -204,55 +259,225 @@ public class MainActivity extends AppCompatActivity {
         updateViewVisibility();
     }
 
-    private void setupGestureDetector() {
-        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            private static final int SWIPE_MIN_DISTANCE = 80;
-            private static final int SWIPE_THRESHOLD_VELOCITY = 100;
+    private void setupThreeDayScroll() {
+        if (hsvThreeDayView == null) return;
 
-            @Override
-            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-                if (isTableView || e1 == null || e2 == null) return false;
-                float diffX = e2.getX() - e1.getX();
-                float diffY = e2.getY() - e1.getY();
-                if (Math.abs(diffX) > Math.abs(diffY)) {
-                    if (Math.abs(diffX) > SWIPE_MIN_DISTANCE && Math.abs(velocityX) > SWIPE_THRESHOLD_VELOCITY) {
-                        if (diffX > 0) {
-                            // Swiped right -> go to previous day
-                            navigateDay(-1);
-                        } else {
-                            // Swiped left -> go to next day
-                            navigateDay(1);
-                        }
-                        return true;
+        hsvThreeDayView.setOnTouchListener((v, event) -> {
+            if (velocityTracker == null) {
+                velocityTracker = VelocityTracker.obtain();
+            }
+            velocityTracker.addMovement(event);
+
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startTouchX = event.getRawX();
+                    startTouchY = event.getRawY();
+                    break;
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    velocityTracker.computeCurrentVelocity(1000);
+                    float vx = velocityTracker.getXVelocity();
+                    float dx = event.getRawX() - startTouchX;
+                    velocityTracker.recycle();
+                    velocityTracker = null;
+
+                    if (columnWidth <= 0) break;
+
+                    int currentScrollX = hsvThreeDayView.getScrollX();
+                    int targetDay;
+
+                    int minFlingVelocity = dpToPx(350);
+                    int flickDist = dpToPx(24);
+
+                    if (Math.abs(dx) > flickDist && vx < -minFlingVelocity) {
+                        targetDay = focusedDayIndex + 1;
+                    } else if (Math.abs(dx) > flickDist && vx > minFlingVelocity) {
+                        targetDay = focusedDayIndex - 1;
+                    } else {
+                        targetDay = Math.round((float) currentScrollX / columnWidth);
                     }
+
+                    if (targetDay < 0) {
+                        int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
+                                ? currentSchedule.getCurrentWeekNumber() : 5;
+                        if (curWeek > 1) {
+                            navigateWeek(-1, 4);
+                        } else {
+                            scrollToDay(0, true);
+                        }
+                    } else if (targetDay > 4) {
+                        int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
+                                ? currentSchedule.getCurrentWeekNumber() : 5;
+                        int total = currentSchedule != null && currentSchedule.getTotalWeeks() > 0
+                                ? currentSchedule.getTotalWeeks() : 53;
+                        if (curWeek < total) {
+                            navigateWeek(1, 0);
+                        } else {
+                            scrollToDay(4, true);
+                        }
+                    } else {
+                        scrollToDay(targetDay, true);
+                    }
+                    return true;
+            }
+            return false;
+        });
+
+        hsvThreeDayView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            if (columnWidth > 0) {
+                int approxDay = Math.max(0, Math.min(4, Math.round((float) scrollX / columnWidth)));
+                if (approxDay != focusedDayIndex) {
+                    focusedDayIndex = approxDay;
+                    updateDaySelectionVisuals(focusedDayIndex);
                 }
-                return false;
             }
         });
     }
 
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (gestureDetector != null && !isTableView) {
-            if (gestureDetector.onTouchEvent(ev)) {
-                return true;
+    private void updateColumnWidths(int containerWidth) {
+        if (containerWidth <= 0) return;
+        columnWidth = containerWidth / 3;
+        int dayMargin = dpToPx(3.5f); // 3.5dp margin on left and right = 7dp gap between days
+        int cardWidth = columnWidth - (2 * dayMargin);
+
+        for (int i = 0; i < 7; i++) {
+            LinearLayout hCol = headerCols[i];
+            if (hCol != null) {
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) hCol.getLayoutParams();
+                if (lp == null) {
+                    lp = new LinearLayout.LayoutParams(cardWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                } else {
+                    lp.width = cardWidth;
+                }
+                lp.leftMargin = dayMargin;
+                lp.rightMargin = dayMargin;
+                lp.setMarginStart(dayMargin);
+                lp.setMarginEnd(dayMargin);
+                hCol.setLayoutParams(lp);
+            }
+
+            MaterialCardView cCol = cardCols[i];
+            if (cCol != null) {
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) cCol.getLayoutParams();
+                if (lp == null) {
+                    lp = new LinearLayout.LayoutParams(cardWidth, ViewGroup.LayoutParams.MATCH_PARENT);
+                } else {
+                    lp.width = cardWidth;
+                }
+                lp.leftMargin = dayMargin;
+                lp.rightMargin = dayMargin;
+                lp.setMarginStart(dayMargin);
+                lp.setMarginEnd(dayMargin);
+                cCol.setLayoutParams(lp);
             }
         }
-        return super.dispatchTouchEvent(ev);
+    }
+
+    private void scrollToDay(int dayIdx, boolean smooth) {
+        if (dayIdx < 0) dayIdx = 0;
+        if (dayIdx > 4) dayIdx = 4;
+        this.focusedDayIndex = dayIdx;
+
+        if (columnWidth <= 0 && flThreeDayWrapper != null) {
+            updateColumnWidths(flThreeDayWrapper.getWidth());
+        }
+
+        if (columnWidth > 0 && hsvThreeDayView != null) {
+            int targetX = dayIdx * columnWidth;
+            if (smooth) {
+                hsvThreeDayView.smoothScrollTo(targetX, 0);
+            } else {
+                hsvThreeDayView.scrollTo(targetX, 0);
+            }
+        }
+
+        updateDaySelectionVisuals(dayIdx);
+    }
+
+    private void updateDaySelectionVisuals(int focusedIdx) {
+        if (currentSchedule == null || currentSchedule.getDays().isEmpty()) return;
+
+        for (int i = 0; i < 7; i++) {
+            LinearLayout hCol = headerCols[i];
+            MaterialCardView cCol = cardCols[i];
+            if (hCol == null || cCol == null) continue;
+
+            if (i == 0) {
+                float alpha = (focusedIdx == 0) ? 0.78f : 0.45f;
+                hCol.setAlpha(alpha);
+                cCol.setAlpha(alpha);
+                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                cCol.setStrokeWidth(dpToPx(1f));
+                continue;
+            }
+
+            if (i == 6) {
+                float alpha = (focusedIdx == 4) ? 0.78f : 0.45f;
+                hCol.setAlpha(alpha);
+                cCol.setAlpha(alpha);
+                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                cCol.setStrokeWidth(dpToPx(1f));
+                continue;
+            }
+
+            int dayIdx = i - 1; // 0..4
+            boolean isFocused = (dayIdx == focusedIdx);
+            boolean isAdjacent = (Math.abs(dayIdx - focusedIdx) == 1);
+            boolean isToday = (dayIdx < currentSchedule.getDays().size() && isDayActuallyToday(currentSchedule.getDays().get(dayIdx)));
+
+            if (isFocused) {
+                hCol.setAlpha(1.0f);
+                cCol.setAlpha(1.0f);
+                if (isToday) {
+                    hCol.setBackgroundResource(R.drawable.bg_header_today);
+                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_today_border));
+                    cCol.setStrokeWidth(dpToPx(1.5f));
+                } else {
+                    hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                    cCol.setStrokeWidth(dpToPx(1f));
+                }
+            } else if (isAdjacent) {
+                hCol.setAlpha(0.78f);
+                cCol.setAlpha(0.78f);
+                if (isToday) {
+                    hCol.setBackgroundResource(R.drawable.bg_header_today);
+                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_today_border));
+                    cCol.setStrokeWidth(dpToPx(1.5f));
+                } else {
+                    hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                    cCol.setStrokeWidth(dpToPx(1f));
+                }
+            } else {
+                hCol.setAlpha(0.45f);
+                cCol.setAlpha(0.45f);
+                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                cCol.setStrokeWidth(dpToPx(1f));
+            }
+        }
     }
 
     private void navigateDay(int delta) {
         if (currentSchedule != null && !currentSchedule.getDays().isEmpty()) {
             int newIndex = focusedDayIndex + delta;
             if (newIndex >= 0 && newIndex < currentSchedule.getDays().size()) {
-                focusedDayIndex = newIndex;
-                renderThreeDayView(currentSchedule, focusedDayIndex);
+                scrollToDay(newIndex, true);
             } else if (newIndex < 0) {
-                // Swiping past Monday -> go to previous week Friday
-                navigateWeek(-1, currentSchedule.getDays().size() - 1);
+                int curWeek = currentSchedule.getCurrentWeekNumber() > 0 ? currentSchedule.getCurrentWeekNumber() : 5;
+                if (curWeek > 1) {
+                    navigateWeek(-1, currentSchedule.getDays().size() - 1);
+                }
             } else {
-                // Swiping past Friday -> go to next week Monday
-                navigateWeek(1, 0);
+                int curWeek = currentSchedule.getCurrentWeekNumber() > 0 ? currentSchedule.getCurrentWeekNumber() : 5;
+                int total = currentSchedule.getTotalWeeks() > 0 ? currentSchedule.getTotalWeeks() : 53;
+                if (curWeek < total) {
+                    navigateWeek(1, 0);
+                }
             }
         }
     }
@@ -277,33 +502,20 @@ public class MainActivity extends AppCompatActivity {
 
         btnJumpToday.setOnClickListener(v -> {
             if (currentSchedule != null) {
-                boolean hasTodayInCurrentWeek = false;
-                for (DaySchedule d : currentSchedule.getDays()) {
-                    if (d.isToday()) {
-                        hasTodayInCurrentWeek = true;
-                        break;
-                    }
-                }
-                if (hasTodayInCurrentWeek) {
-                    focusedDayIndex = getTodayDayIndex(currentSchedule);
-                    renderThreeDayView(currentSchedule, focusedDayIndex);
+                int targetIndex = getTodayDayIndex(currentSchedule);
+                if (targetIndex != focusedDayIndex) {
+                    scrollToDay(targetIndex, true);
                 } else {
                     refreshScheduleFromNetwork();
                 }
             }
         });
-
-        llHeaderYesterday.setOnClickListener(v -> navigateDay(-1));
-        llHeaderTomorrow.setOnClickListener(v -> navigateDay(1));
     }
 
     private void showPopupMenu(View anchor) {
         PopupMenu popup = new PopupMenu(this, anchor);
         popup.getMenu().add(0, 1, 0, isTableView ? "3-dnevni pogled" : "Tedenska tabela");
-        popup.getMenu().add(0, 3, 1, "Prejšnji teden");
-        popup.getMenu().add(0, 4, 2, "Naslednji teden");
-        popup.getMenu().add(0, 5, 3, "Izberi teden...");
-        popup.getMenu().add(0, 2, 4, "Nastavitve");
+        popup.getMenu().add(0, 2, 1, "Nastavitve");
         popup.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 toggleViewMode();
@@ -311,45 +523,228 @@ public class MainActivity extends AppCompatActivity {
             } else if (item.getItemId() == 2) {
                 showSettingsDialog();
                 return true;
-            } else if (item.getItemId() == 3) {
-                navigateWeek(-1, -1);
-                return true;
-            } else if (item.getItemId() == 4) {
-                navigateWeek(1, -1);
-                return true;
-            } else if (item.getItemId() == 5) {
-                showWeekPickerDialog();
-                return true;
             }
             return false;
         });
         popup.show();
     }
 
+    private static class WeekPickerItem {
+        final int weekNumber;
+        final String title;
+        final String dateRange;
+        final boolean isCurrentByDate;
+
+        WeekPickerItem(int weekNumber, String title, String dateRange, boolean isCurrentByDate) {
+            this.weekNumber = weekNumber;
+            this.title = title;
+            this.dateRange = dateRange;
+            this.isCurrentByDate = isCurrentByDate;
+        }
+    }
+
+    private int getCurrentWeekByDate(ScheduleData schedule) {
+        if (schedule == null) return 5;
+        int curWeek = schedule.getCurrentWeekNumber() > 0 ? schedule.getCurrentWeekNumber() : 5;
+
+        Calendar baseMonday = Calendar.getInstance(TZ_SLOVENIA);
+        boolean dateFound = false;
+
+        if (!schedule.getDays().isEmpty()) {
+            String dateText = schedule.getDays().get(0).getDateText();
+            if (dateText != null && !dateText.isEmpty()) {
+                String[] parts = dateText.replace(".", " ").trim().split("\\s+");
+                if (parts.length >= 2) {
+                    try {
+                        int day = Integer.parseInt(parts[0]);
+                        int month = Integer.parseInt(parts[1]) - 1;
+                        int year = parts.length >= 3 ? Integer.parseInt(parts[2]) : baseMonday.get(Calendar.YEAR);
+                        baseMonday.set(Calendar.YEAR, year);
+                        baseMonday.set(Calendar.MONTH, month);
+                        baseMonday.set(Calendar.DAY_OF_MONTH, day);
+                        baseMonday.set(Calendar.HOUR_OF_DAY, 12);
+                        baseMonday.set(Calendar.MINUTE, 0);
+                        baseMonday.set(Calendar.SECOND, 0);
+                        baseMonday.set(Calendar.MILLISECOND, 0);
+                        dateFound = true;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        if (!dateFound) {
+            return curWeek;
+        }
+
+        Calendar now = Calendar.getInstance(TZ_SLOVENIA);
+        now.set(Calendar.HOUR_OF_DAY, 12);
+        now.set(Calendar.MINUTE, 0);
+        now.set(Calendar.SECOND, 0);
+        now.set(Calendar.MILLISECOND, 0);
+
+        long diffMillis = now.getTimeInMillis() - baseMonday.getTimeInMillis();
+        double diffDays = (double) diffMillis / (1000.0 * 60 * 60 * 24);
+        int weekOffset = (int) Math.floor(diffDays / 7.0);
+
+        int result = curWeek + weekOffset;
+        if (result < 1) result = 1;
+        int total = schedule.getTotalWeeks() > 0 ? schedule.getTotalWeeks() : 53;
+        if (result > total) result = total;
+        return result;
+    }
+
+    private String getWeekDateRange(int targetWeek, ScheduleData schedule) {
+        if (schedule == null) return "";
+
+        int curWeek = schedule.getCurrentWeekNumber();
+        if (curWeek <= 0) curWeek = 5;
+
+        Calendar baseMonday = Calendar.getInstance(TZ_SLOVENIA);
+        boolean dateFound = false;
+
+        if (!schedule.getDays().isEmpty()) {
+            String dateText = schedule.getDays().get(0).getDateText();
+            if (dateText != null && !dateText.isEmpty()) {
+                String[] parts = dateText.replace(".", " ").trim().split("\\s+");
+                if (parts.length >= 2) {
+                    try {
+                        int day = Integer.parseInt(parts[0]);
+                        int month = Integer.parseInt(parts[1]) - 1;
+                        int year = parts.length >= 3 ? Integer.parseInt(parts[2]) : baseMonday.get(Calendar.YEAR);
+                        baseMonday.set(Calendar.YEAR, year);
+                        baseMonday.set(Calendar.MONTH, month);
+                        baseMonday.set(Calendar.DAY_OF_MONTH, day);
+                        dateFound = true;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+
+        if (!dateFound) {
+            int dayOfWeek = baseMonday.get(Calendar.DAY_OF_WEEK);
+            int daysFromMonday = (dayOfWeek == Calendar.SUNDAY) ? 6 : (dayOfWeek - Calendar.MONDAY);
+            baseMonday.add(Calendar.DAY_OF_YEAR, -daysFromMonday);
+        }
+
+        Calendar targetCal = (Calendar) baseMonday.clone();
+        targetCal.add(Calendar.DAY_OF_YEAR, (targetWeek - curWeek) * 7);
+
+        int startDay = targetCal.get(Calendar.DAY_OF_MONTH);
+        int startMonth = targetCal.get(Calendar.MONTH) + 1;
+
+        targetCal.add(Calendar.DAY_OF_YEAR, 6);
+        int endDay = targetCal.get(Calendar.DAY_OF_MONTH);
+        int endMonth = targetCal.get(Calendar.MONTH) + 1;
+
+        return startDay + ". " + startMonth + ". – " + endDay + ". " + endMonth + ".";
+    }
+
     private void showWeekPickerDialog() {
         if (currentSchedule == null) return;
         int total = currentSchedule.getTotalWeeks() > 0 ? currentSchedule.getTotalWeeks() : 53;
         int cur = currentSchedule.getCurrentWeekNumber() > 0 ? currentSchedule.getCurrentWeekNumber() : 5;
-        
-        String[] weekOptions = new String[total];
+        int todayWeek = getCurrentWeekByDate(currentSchedule);
+
+        Calendar todayCal = Calendar.getInstance(TZ_SLOVENIA);
+        SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE, d. M.", new Locale("sl", "SI"));
+        String todayDateStr = dayFormat.format(todayCal.getTime());
+
+        List<WeekPickerItem> items = new ArrayList<>();
         int selectedIndex = 0;
         for (int i = 0; i < total; i++) {
             int w = i + 1;
-            weekOptions[i] = "Teden " + w + (w == cur ? " (trenutno)" : "");
+            boolean isTodayWeek = (w == todayWeek);
+            String title = "Teden " + w;
+            String dateRange = getWeekDateRange(w, currentSchedule);
+            items.add(new WeekPickerItem(w, title, dateRange, isTodayWeek));
             if (w == cur) selectedIndex = i;
         }
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Izbira tedna")
-                .setSingleChoiceItems(weekOptions, selectedIndex, (dialog, which) -> {
-                    dialog.dismiss();
-                    int targetWeek = which + 1;
-                    if (targetWeek != cur) {
-                        fetchWeek(targetWeek, -1);
-                    }
-                })
-                .setNegativeButton("Prekliči", null)
-                .show();
+        final int currentSelectedIndex = selectedIndex;
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_week_picker, null);
+        ListView lvWeeks = dialogView.findViewById(R.id.lvWeeks);
+        ImageButton btnClose = dialogView.findViewById(R.id.btnCloseWeekPicker);
+        TextView tvCurrentWeekByDate = dialogView.findViewById(R.id.tvCurrentWeekByDate);
+
+        if (tvCurrentWeekByDate != null) {
+            tvCurrentWeekByDate.setText("Danes po datumu: Teden " + todayWeek + " (" + todayDateStr + ")");
+        }
+
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setView(dialogView)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+
+        BaseAdapter adapter = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return items.size();
+            }
+
+            @Override
+            public WeekPickerItem getItem(int position) {
+                return items.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                if (convertView == null) {
+                    convertView = getLayoutInflater().inflate(R.layout.item_dialog_week_picker, parent, false);
+                }
+                WeekPickerItem item = getItem(position);
+                LinearLayout llRoot = convertView.findViewById(R.id.llWeekPickerItemRoot);
+                TextView tvTitle = convertView.findViewById(R.id.tvWeekTitle);
+                TextView tvBadge = convertView.findViewById(R.id.tvCurrentBadge);
+                TextView tvDateRange = convertView.findViewById(R.id.tvWeekDateRange);
+                ImageView ivCheck = convertView.findViewById(R.id.ivCheck);
+
+                boolean isSelected = (position == currentSelectedIndex);
+
+                if (isSelected) {
+                    llRoot.setBackgroundResource(R.drawable.bg_week_picker_selected);
+                    tvTitle.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.ea_blue));
+                    tvDateRange.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.ea_blue));
+                    ivCheck.setVisibility(View.VISIBLE);
+                } else {
+                    llRoot.setBackgroundResource(R.drawable.bg_week_picker_unselected);
+                    tvTitle.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.ea_text_primary));
+                    tvDateRange.setTextColor(ContextCompat.getColor(MainActivity.this, R.color.ea_text_secondary));
+                    ivCheck.setVisibility(View.GONE);
+                }
+
+                tvTitle.setText(item.title);
+                tvDateRange.setText(item.dateRange);
+                tvBadge.setVisibility(item.isCurrentByDate ? View.VISIBLE : View.GONE);
+                tvBadge.setText("danes");
+
+                return convertView;
+            }
+        };
+
+        lvWeeks.setAdapter(adapter);
+        lvWeeks.setSelection(Math.max(0, currentSelectedIndex - 2));
+
+        lvWeeks.setOnItemClickListener((parent, view, position, id) -> {
+            dialog.dismiss();
+            WeekPickerItem item = items.get(position);
+            int targetWeek = item.weekNumber;
+            if (targetWeek != cur) {
+                fetchWeek(targetWeek, -1);
+            }
+        });
+
+        dialog.show();
     }
 
     private void navigateWeek(int delta, int targetDayIndex) {
@@ -394,7 +789,7 @@ public class MainActivity extends AppCompatActivity {
                         if (targetDayIndex >= 0 && targetDayIndex < weekSchedule.getDays().size()) {
                             focusedDayIndex = targetDayIndex;
                             if (!isTableView) {
-                                renderThreeDayView(weekSchedule, focusedDayIndex);
+                                scrollToDay(focusedDayIndex, true);
                             }
                         }
                     });
@@ -432,14 +827,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateViewVisibility() {
-        layoutThreeDayView.setVisibility(!isTableView ? View.VISIBLE : View.GONE);
-        layoutTableView.setVisibility(isTableView ? View.VISIBLE : View.GONE);
+        if (flThreeDayWrapper != null) {
+            flThreeDayWrapper.setVisibility(!isTableView ? View.VISIBLE : View.GONE);
+        }
+        if (layoutTableView != null) {
+            layoutTableView.setVisibility(isTableView ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void loadCachedSchedule() {
         ScheduleData cached = UrnikStorage.loadSchedule(this);
         if (cached != null) {
             displaySchedule(cached);
+            if (isWeekend()) {
+                // If today is Saturday or Sunday, refresh from network to load next week's Monday schedule
+                refreshScheduleFromNetwork();
+            }
         } else {
             refreshScheduleFromNetwork();
         }
@@ -449,8 +852,12 @@ public class MainActivity extends AppCompatActivity {
         this.currentSchedule = data;
         if (data == null || data.getDays().isEmpty()) {
             tvEmptyState.setVisibility(View.VISIBLE);
-            layoutThreeDayView.setVisibility(View.GONE);
-            layoutTableView.setVisibility(View.GONE);
+            if (flThreeDayWrapper != null) {
+                flThreeDayWrapper.setVisibility(View.GONE);
+            }
+            if (layoutTableView != null) {
+                layoutTableView.setVisibility(View.GONE);
+            }
             return;
         }
 
@@ -487,17 +894,38 @@ public class MainActivity extends AppCompatActivity {
         return cleaned.isEmpty() ? "Urnik" : cleaned;
     }
 
+    private boolean isWeekend() {
+        Calendar cal = Calendar.getInstance(TZ_SLOVENIA);
+        int dow = cal.get(Calendar.DAY_OF_WEEK);
+        return (dow == Calendar.SATURDAY || dow == Calendar.SUNDAY);
+    }
+
+    private boolean isDayActuallyToday(DaySchedule day) {
+        if (day == null) return false;
+        if (isWeekend()) return false;
+        if (day.isToday()) return true;
+        SimpleDateFormat daySdf = new SimpleDateFormat("d. M.", Locale.getDefault());
+        daySdf.setTimeZone(TZ_SLOVENIA);
+        String todayDateStr = daySdf.format(new Date());
+        return day.getDateText() != null && day.getDateText().trim().startsWith(todayDateStr);
+    }
+
     private int getTodayDayIndex(ScheduleData data) {
         if (data == null || data.getDays().isEmpty()) return 0;
         
-        // 1. Check if parser marked any day as today
+        // 1. Weekend (Saturday or Sunday): open on next week Monday (index 0)
+        if (isWeekend()) {
+            return 0;
+        }
+
+        // 2. Check if parser marked any day as today
         for (int i = 0; i < data.getDays().size(); i++) {
             if (data.getDays().get(i).isToday()) {
                 return i;
             }
         }
         
-        // 2. Match by current date in Slovenia timezone (e.g. "1. 10.")
+        // 3. Match by current date in Slovenia timezone (e.g. "1. 10.")
         SimpleDateFormat daySdf = new SimpleDateFormat("d. M.", Locale.getDefault());
         daySdf.setTimeZone(TZ_SLOVENIA);
         String todayDateStr = daySdf.format(new Date());
@@ -508,7 +936,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         
-        // 3. Fallback by Calendar DAY_OF_WEEK (MONDAY = 0)
+        // 4. Fallback by Calendar DAY_OF_WEEK (MONDAY = 0)
         Calendar cal = Calendar.getInstance(TZ_SLOVENIA);
         int dow = cal.get(Calendar.DAY_OF_WEEK);
         int mapped = dow - Calendar.MONDAY;
@@ -516,17 +944,12 @@ public class MainActivity extends AppCompatActivity {
             return mapped;
         }
         
-        // Weekend: Saturday shows Friday, Sunday shows Monday
-        if (dow == Calendar.SATURDAY) {
-            return data.getDays().size() - 1;
-        }
         return 0;
     }
 
     /**
-     * Renders the 3-column split view (Yesterday, Current Day, Tomorrow).
-     * Highlights Current Day and dims the other two.
-     * Highlights currently active hour, and next hour during break time in less strong color.
+     * Renders all 5 days of the week into the horizontal 7-column strip (Spacer, Mon..Fri, Spacer).
+     * Viewport displays exactly 3 days at a time.
      */
     private void renderThreeDayView(ScheduleData data, int centerIdx) {
         if (data == null || data.getDays().isEmpty()) return;
@@ -534,93 +957,29 @@ public class MainActivity extends AppCompatActivity {
         int totalDays = data.getDays().size();
         if (centerIdx < 0) centerIdx = 0;
         if (centerIdx >= totalDays) centerIdx = totalDays - 1;
+        this.focusedDayIndex = centerIdx;
 
-        DaySchedule centerDay = data.getDays().get(centerIdx);
-        DaySchedule yesterdayDay = centerIdx > 0 ? data.getDays().get(centerIdx - 1) : null;
-        DaySchedule tomorrowDay = centerIdx < totalDays - 1 ? data.getDays().get(centerIdx + 1) : null;
-
-        boolean isActualToday = centerDay.isToday();
-        if (!isActualToday) {
-            SimpleDateFormat daySdf = new SimpleDateFormat("d. M.", Locale.getDefault());
-            daySdf.setTimeZone(TZ_SLOVENIA);
-            String todayDateStr = daySdf.format(new Date());
-            if (centerDay.getDateText() != null && centerDay.getDateText().trim().startsWith(todayDateStr)) {
-                isActualToday = true;
-            }
-        }
-
-        // 1. Configure Header 1 (Yesterday)
-        if (yesterdayDay != null) {
-            llHeaderYesterday.setVisibility(View.VISIBLE);
-            tvHeaderYesterdayBadge.setText(isActualToday ? "VČERAJ" : "PREJŠNJI DAN");
-            tvHeaderYesterdayName.setText(yesterdayDay.getDayName());
-            tvHeaderYesterdayDate.setText(yesterdayDay.getDateText());
-            llHeaderYesterday.setAlpha(0.78f);
+        int containerWidth = flThreeDayWrapper.getWidth();
+        if (containerWidth > 0) {
+            updateColumnWidths(containerWidth);
         } else {
-            llHeaderYesterday.setVisibility(View.VISIBLE);
-            tvHeaderYesterdayBadge.setText("PREJŠNJI");
-            tvHeaderYesterdayName.setText("—");
-            tvHeaderYesterdayDate.setText("Ni podatka");
-            llHeaderYesterday.setAlpha(0.5f);
+            flThreeDayWrapper.post(() -> {
+                updateColumnWidths(flThreeDayWrapper.getWidth());
+                scrollToDay(focusedDayIndex, false);
+            });
         }
 
-        // 2. Configure Header 2 (Current Day - Highlighted!)
-        llHeaderToday.setVisibility(View.VISIBLE);
-        tvHeaderTodayBadge.setText(isActualToday ? "⭐ DANES" : "IZBRANI DAN");
-        tvHeaderTodayName.setText(centerDay.getDayName());
-        tvHeaderTodayDate.setText(centerDay.getDateText());
-        llHeaderToday.setAlpha(1.0f);
+        // Configure Left Spacer (Col 0)
+        headerBadges[0].setVisibility(View.GONE);
+        headerNames[0].setText("—");
+        headerDates[0].setText("Ni podatka");
+        columnLayouts[0].removeAllViews();
 
-        // 3. Configure Header 3 (Tomorrow)
-        if (tomorrowDay != null) {
-            llHeaderTomorrow.setVisibility(View.VISIBLE);
-            tvHeaderTomorrowBadge.setText(isActualToday ? "JUTRI" : "NASLEDNJI DAN");
-            tvHeaderTomorrowName.setText(tomorrowDay.getDayName());
-            tvHeaderTomorrowDate.setText(tomorrowDay.getDateText());
-            llHeaderTomorrow.setAlpha(0.78f);
-        } else {
-            llHeaderTomorrow.setVisibility(View.VISIBLE);
-            tvHeaderTomorrowBadge.setText("NASLEDNJI");
-            tvHeaderTomorrowName.setText("—");
-            tvHeaderTomorrowDate.setText("Ni podatka");
-            llHeaderTomorrow.setAlpha(0.5f);
-        }
-
-        // Determine active period and next period during break for the center day
-        Calendar now = Calendar.getInstance(TZ_SLOVENIA);
-        int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
-
-        int activePeriodIdx = -1;
-        int nextPeriodIdx = -1;
-
-        if (isActualToday) {
-            // Find active period
-            for (int i = 0; i < centerDay.getPeriods().size(); i++) {
-                PeriodSchedule p = centerDay.getPeriods().get(i);
-                int[] se = parseStartEndMinutes(p);
-                int start = se[0];
-                int end = se[1];
-                if (start > 0 && end > 0) {
-                    if (nowMinutes >= start && nowMinutes < end) {
-                        activePeriodIdx = i;
-                        break;
-                    } else if (nowMinutes < start) {
-                        if (nextPeriodIdx == -1) {
-                            nextPeriodIdx = i;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. Render Hours into the 3 Unified Columns
-        llYesterdayColumn.removeAllViews();
-        llTodayColumn.removeAllViews();
-        llTomorrowColumn.removeAllViews();
-
-        cardYesterdayColumn.setAlpha(yesterdayDay != null ? 0.78f : 0.45f);
-        cardTodayColumn.setAlpha(1.0f);
-        cardTomorrowColumn.setAlpha(tomorrowDay != null ? 0.78f : 0.45f);
+        // Configure Right Spacer (Col 6)
+        headerBadges[6].setVisibility(View.GONE);
+        headerNames[6].setText("—");
+        headerDates[6].setText("Ni podatka");
+        columnLayouts[6].removeAllViews();
 
         int[] range = getVisibleHourRange(data);
         int startHour = range[0];
@@ -628,74 +987,99 @@ public class MainActivity extends AppCompatActivity {
 
         LayoutInflater inflater = LayoutInflater.from(this);
 
-        for (int h = startHour; h <= endHour; h++) {
-            PeriodSchedule centerPeriod = h < centerDay.getPeriods().size() ? centerDay.getPeriods().get(h) : null;
-            PeriodSchedule yesterdayPeriod = (yesterdayDay != null && h < yesterdayDay.getPeriods().size()) ? yesterdayDay.getPeriods().get(h) : null;
-            PeriodSchedule tomorrowPeriod = (tomorrowDay != null && h < tomorrowDay.getPeriods().size()) ? tomorrowDay.getPeriods().get(h) : null;
+        Calendar now = Calendar.getInstance(TZ_SLOVENIA);
+        int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
 
-            int maxClassesInTimespan = 0;
-            if (centerPeriod != null && centerPeriod.getItems() != null) {
-                maxClassesInTimespan = Math.max(maxClassesInTimespan, centerPeriod.getItems().size());
-            }
-            if (yesterdayPeriod != null && yesterdayPeriod.getItems() != null) {
-                maxClassesInTimespan = Math.max(maxClassesInTimespan, yesterdayPeriod.getItems().size());
-            }
-            if (tomorrowPeriod != null && tomorrowPeriod.getItems() != null) {
-                maxClassesInTimespan = Math.max(maxClassesInTimespan, tomorrowPeriod.getItems().size());
-            }
+        // Render each day (Cols 1 to 5 for Days 0 to 4)
+        for (int d = 0; d < 5; d++) {
+            int colIdx = d + 1;
+            columnLayouts[colIdx].removeAllViews();
 
-            float rowWeight = (maxClassesInTimespan >= 2) ? 1.75f : 1.0f;
+            if (d < data.getDays().size()) {
+                DaySchedule day = data.getDays().get(d);
+                boolean isToday = isDayActuallyToday(day);
 
-            // Add thin divider between consecutive hours in each column
-            if (h > startHour) {
-                addHourDivider(llYesterdayColumn);
-                addHourDivider(llTodayColumn);
-                addHourDivider(llTomorrowColumn);
-            }
+                if (isToday) {
+                    headerBadges[colIdx].setVisibility(View.VISIBLE);
+                    headerBadges[colIdx].setText("⭐ DANES");
+                } else {
+                    headerBadges[colIdx].setVisibility(View.GONE);
+                    headerBadges[colIdx].setText("");
+                }
 
-            // Check State of this hour on the center day
-            PeriodHourState state = PeriodHourState.FUTURE;
-            boolean isMalica = isMalicaPeriod(centerPeriod);
+                headerNames[colIdx].setText(day.getDayName());
+                headerDates[colIdx].setText(day.getDateText());
 
-            if (isActualToday) {
-                if (h == activePeriodIdx) {
-                    state = PeriodHourState.CURRENTLY_ACTIVE;
-                } else if (activePeriodIdx == -1 && h == nextPeriodIdx) {
-                    state = PeriodHourState.NEXT_DURING_BREAK;
-                } else if (centerPeriod != null) {
-                    int[] se = parseStartEndMinutes(centerPeriod);
-                    if (se[1] > 0 && nowMinutes >= se[1]) {
-                        state = PeriodHourState.PASSED;
+                int activePeriodIdx = -1;
+                int nextPeriodIdx = -1;
+
+                if (isToday) {
+                    for (int i = 0; i < day.getPeriods().size(); i++) {
+                        PeriodSchedule p = day.getPeriods().get(i);
+                        int[] se = parseStartEndMinutes(p);
+                        int start = se[0];
+                        int end = se[1];
+                        if (start > 0 && end > 0) {
+                            if (nowMinutes >= start && nowMinutes < end) {
+                                activePeriodIdx = i;
+                                break;
+                            } else if (nowMinutes < start) {
+                                if (nextPeriodIdx == -1) {
+                                    nextPeriodIdx = i;
+                                }
+                            }
+                        }
                     }
                 }
+
+                for (int h = startHour; h <= endHour; h++) {
+                    PeriodSchedule period = h < day.getPeriods().size() ? day.getPeriods().get(h) : null;
+
+                    if (h > startHour) {
+                        addHourDivider(columnLayouts[colIdx]);
+                    }
+
+                    PeriodHourState state = PeriodHourState.FUTURE;
+                    boolean isMalica = isMalicaPeriod(period);
+
+                    if (isToday) {
+                        if (h == activePeriodIdx) {
+                            state = PeriodHourState.CURRENTLY_ACTIVE;
+                        } else if (activePeriodIdx == -1 && h == nextPeriodIdx) {
+                            state = PeriodHourState.NEXT_DURING_BREAK;
+                        } else if (period != null) {
+                            int[] se = parseStartEndMinutes(period);
+                            if (se[1] > 0 && nowMinutes >= se[1]) {
+                                state = PeriodHourState.PASSED;
+                            }
+                        }
+                    }
+
+                    LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
+
+                    View cellView = createCellView(period, isToday, state, isMalica, inflater, columnLayouts[colIdx]);
+                    cellView.setLayoutParams(cellLp);
+                    columnLayouts[colIdx].addView(cellView);
+                }
+            } else {
+                headerBadges[colIdx].setVisibility(View.GONE);
+                headerNames[colIdx].setText("—");
+                headerDates[colIdx].setText("Ni podatka");
             }
-
-            LinearLayout.LayoutParams cellLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 0, rowWeight);
-
-            // Render Center Cell (Today - Highlighted)
-            View todayCell = createCellView(centerPeriod, true, state, isMalica, inflater, llTodayColumn);
-            todayCell.setLayoutParams(cellLp);
-            llTodayColumn.addView(todayCell);
-
-            // Render Left Cell (Yesterday - Dimmed)
-            boolean yMalica = isMalicaPeriod(yesterdayPeriod);
-            View yesterdayCell = createCellView(yesterdayPeriod, false, PeriodHourState.PASSED, yMalica, inflater, llYesterdayColumn);
-            yesterdayCell.setLayoutParams(new LinearLayout.LayoutParams(cellLp));
-            llYesterdayColumn.addView(yesterdayCell);
-
-            // Render Right Cell (Tomorrow - Dimmed)
-            boolean tMalica = isMalicaPeriod(tomorrowPeriod);
-            View tomorrowCell = createCellView(tomorrowPeriod, false, PeriodHourState.FUTURE, tMalica, inflater, llTomorrowColumn);
-            tomorrowCell.setLayoutParams(new LinearLayout.LayoutParams(cellLp));
-            llTomorrowColumn.addView(tomorrowCell);
         }
+
+        updateDaySelectionVisuals(focusedDayIndex);
+
+        hsvThreeDayView.post(() -> scrollToDay(focusedDayIndex, false));
     }
 
     private void addHourDivider(LinearLayout col) {
         View div = new View(this);
-        div.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1)));
-        div.setBackgroundColor(ContextCompat.getColor(this, R.color.ea_card_border));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1.5f));
+        lp.setMargins(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2));
+        div.setLayoutParams(lp);
+        div.setBackgroundColor(ContextCompat.getColor(this, R.color.ea_hour_divider));
         col.addView(div);
     }
 
@@ -758,10 +1142,17 @@ public class MainActivity extends AppCompatActivity {
             llCellEmpty.setVisibility(View.GONE);
             llCellItems.setVisibility(View.GONE);
 
+            TextView tvMalica = cellView.findViewById(R.id.tvMalicaTitle);
             if (isTodayColumn) {
                 llCellRoot.setBackgroundResource(R.drawable.bg_card_malica);
+                if (tvMalica != null) {
+                    tvMalica.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_text));
+                }
             } else {
                 llCellRoot.setBackgroundResource(R.drawable.bg_cell_malica_dimmed);
+                if (tvMalica != null) {
+                    tvMalica.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_dimmed_text));
+                }
             }
 
             return cellView;
@@ -804,55 +1195,125 @@ public class MainActivity extends AppCompatActivity {
             llCellRoot.setBackgroundColor(Color.TRANSPARENT);
         }
 
-        for (int i = 0; i < period.getItems().size(); i++) {
-            ClassItem item = period.getItems().get(i);
-            View subView = inflater.inflate(R.layout.item_three_day_subitem, llCellItems, false);
-
-            TextView tvSubj = subView.findViewById(R.id.tvSubitemSubject);
-            TextView tvRoom = subView.findViewById(R.id.tvSubitemRoom);
-            TextView tvTeacher = subView.findViewById(R.id.tvSubitemTeacher);
-
-            String subjText = item.getSubject();
-            if (isTodayColumn && state == PeriodHourState.CURRENTLY_ACTIVE) {
-                subjText = "▶ " + item.getSubject();
-                tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_active_text));
-            } else if (isTodayColumn && state == PeriodHourState.NEXT_DURING_BREAK) {
-                subjText = "⏳ " + item.getSubject();
-                tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_next_text));
-            }
-            tvSubj.setText(subjText);
-
-            if (!item.getClassroom().isEmpty()) {
-                tvRoom.setText(item.getClassroom());
-                tvRoom.setVisibility(View.VISIBLE);
-            } else {
-                tvRoom.setVisibility(View.GONE);
-            }
-
-            if (!item.getProfessor().isEmpty()) {
-                tvTeacher.setText(item.getProfessor());
-                tvTeacher.setVisibility(View.VISIBLE);
-            } else {
-                tvTeacher.setVisibility(View.GONE);
-            }
-
-            llCellItems.addView(subView);
-
-            // Line between classes that happen in the same time period
-            if (i < period.getItems().size() - 1) {
-                View divider = new View(this);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(1.5f));
-                lp.setMargins(dpToPx(4), dpToPx(2.5f), dpToPx(4), dpToPx(2.5f));
-                divider.setLayoutParams(lp);
-                int divColor;
-                if (isTodayColumn && state == PeriodHourState.CURRENTLY_ACTIVE) {
-                    divColor = ContextCompat.getColor(this, R.color.ea_hour_active_border);
-                } else {
-                    divColor = ContextCompat.getColor(this, R.color.ea_class_divider);
+        List<ClassItem> items = period.getItems();
+        boolean hasMultiple = items != null && items.size() > 1;
+        boolean allSameSubject = false;
+        if (hasMultiple) {
+            String firstSubj = items.get(0).getSubject().trim();
+            allSameSubject = true;
+            for (ClassItem it : items) {
+                if (!it.getSubject().trim().equalsIgnoreCase(firstSubj)) {
+                    allSameSubject = false;
+                    break;
                 }
-                divider.setBackgroundColor(divColor);
-                llCellItems.addView(divider);
+            }
+        }
+
+        if (hasMultiple && allSameSubject) {
+            // Display subject name ONCE at the top, followed by dashed line, then Professor on left + Class number on right
+            View sharedView = inflater.inflate(R.layout.item_three_day_shared_subject, llCellItems, false);
+            TextView tvSharedSubj = sharedView.findViewById(R.id.tvSharedSubject);
+            View vSubjectDivider = sharedView.findViewById(R.id.vSubjectDivider);
+            if (vSubjectDivider != null) {
+                vSubjectDivider.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            }
+            LinearLayout llSharedGroups = sharedView.findViewById(R.id.llSharedGroups);
+
+            String subjName = items.get(0).getSubject();
+            if (isTodayColumn && state == PeriodHourState.CURRENTLY_ACTIVE) {
+                subjName = "▶ " + subjName;
+                tvSharedSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_active_text));
+            } else if (isTodayColumn && state == PeriodHourState.NEXT_DURING_BREAK) {
+                subjName = "⏳ " + subjName;
+                tvSharedSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_next_text));
+            } else {
+                tvSharedSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_text_primary));
+            }
+            tvSharedSubj.setText(subjName);
+
+            for (int i = 0; i < items.size(); i++) {
+                ClassItem item = items.get(i);
+                View groupView = inflater.inflate(R.layout.item_three_day_group_row, llSharedGroups, false);
+                TextView tvGroupTeacher = groupView.findViewById(R.id.tvGroupTeacher);
+                TextView tvGroupRoom = groupView.findViewById(R.id.tvGroupRoom);
+
+                if (!item.getProfessor().isEmpty()) {
+                    tvGroupTeacher.setText(item.getProfessor());
+                    tvGroupTeacher.setVisibility(View.VISIBLE);
+                } else {
+                    tvGroupTeacher.setVisibility(View.GONE);
+                }
+
+                if (!item.getClassroom().isEmpty()) {
+                    tvGroupRoom.setText(item.getClassroom());
+                    tvGroupRoom.setVisibility(View.VISIBLE);
+                } else {
+                    tvGroupRoom.setVisibility(View.GONE);
+                }
+
+                llSharedGroups.addView(groupView);
+
+                if (i < items.size() - 1) {
+                    View divider = new View(this);
+                    divider.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(1.5f));
+                    lp.setMargins(0, dpToPx(1f), 0, dpToPx(1f));
+                    divider.setLayoutParams(lp);
+                    divider.setBackgroundResource(R.drawable.divider_class_group_dashed);
+                    llSharedGroups.addView(divider);
+                }
+            }
+
+            llCellItems.addView(sharedView);
+        } else {
+            for (int i = 0; i < period.getItems().size(); i++) {
+                ClassItem item = period.getItems().get(i);
+                View subView = inflater.inflate(R.layout.item_three_day_subitem, llCellItems, false);
+
+                TextView tvSubj = subView.findViewById(R.id.tvSubitemSubject);
+                TextView tvRoom = subView.findViewById(R.id.tvSubitemRoom);
+                TextView tvTeacher = subView.findViewById(R.id.tvSubitemTeacher);
+
+                String subjText = item.getSubject();
+                if (isTodayColumn && state == PeriodHourState.CURRENTLY_ACTIVE) {
+                    subjText = "▶ " + item.getSubject();
+                    tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_active_text));
+                } else if (isTodayColumn && state == PeriodHourState.NEXT_DURING_BREAK) {
+                    subjText = "⏳ " + item.getSubject();
+                    tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_next_text));
+                } else {
+                    tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_text_primary));
+                }
+                tvSubj.setText(subjText);
+
+                if (!item.getClassroom().isEmpty()) {
+                    tvRoom.setText(item.getClassroom());
+                    tvRoom.setVisibility(View.VISIBLE);
+                } else {
+                    tvRoom.setVisibility(View.GONE);
+                }
+
+                if (!item.getProfessor().isEmpty()) {
+                    tvTeacher.setText(item.getProfessor());
+                    tvTeacher.setVisibility(View.VISIBLE);
+                } else {
+                    tvTeacher.setVisibility(View.GONE);
+                }
+
+                llCellItems.addView(subView);
+
+                // Distinct dashed divider between multiple classes occurring in the same period
+                if (i < period.getItems().size() - 1) {
+                    View divider = new View(this);
+                    divider.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(2f));
+                    lp.setMargins(dpToPx(4), dpToPx(1), dpToPx(4), dpToPx(1));
+                    divider.setLayoutParams(lp);
+                    divider.setBackgroundResource(R.drawable.divider_class_group_dashed);
+                    llCellItems.addView(divider);
+                }
             }
         }
 
@@ -989,9 +1450,10 @@ public class MainActivity extends AppCompatActivity {
                     TextView tvSubj = subView.findViewById(R.id.tvTableSubject);
                     TextView tvProfRoom = subView.findViewById(R.id.tvTableProfessorAndRoom);
                     tvSubj.setText("🍽️ Malica");
-                    tvSubj.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_text));
+                    int malicaColor = ContextCompat.getColor(this, day.isToday() ? R.color.ea_malica_text : R.color.ea_malica_dimmed_text);
+                    tvSubj.setTextColor(malicaColor);
                     tvProfRoom.setText("Odmor");
-                    tvProfRoom.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_text));
+                    tvProfRoom.setTextColor(malicaColor);
                     cellItems.addView(subView);
                 } else if (period != null) {
                     for (int i = 0; i < period.getItems().size(); i++) {
@@ -1075,6 +1537,39 @@ public class MainActivity extends AppCompatActivity {
                 ScheduleData freshSchedule = UrnikParser.parse(html, url);
 
                 if (freshSchedule != null && !freshSchedule.getDays().isEmpty()) {
+                    if (isWeekend()) {
+                        int curWeek = freshSchedule.getCurrentWeekNumber();
+                        int nextWeek = curWeek > 0 ? curWeek + 1 : 0;
+                        if (nextWeek > 0 && (freshSchedule.getTotalWeeks() == 0 || nextWeek <= freshSchedule.getTotalWeeks())) {
+                            // On Saturday/Sunday, automatically fetch next week and open on Monday
+                            final String baseUrl = UrnikStorage.getSavedUrl(MainActivity.this);
+                            int idSola = freshSchedule.getIdSola();
+                            if (idSola == 0) idSola = 224;
+                            final String ajaxUrl = UrnikFetcher.buildAjaxWeekUrl(baseUrl, idSola, nextWeek);
+                            if (ajaxUrl != null) {
+                                try {
+                                    String nextWeekResponse = UrnikFetcher.fetchWeekAjaxSync(ajaxUrl);
+                                    ScheduleData nextWeekSchedule = UrnikParser.parseAjaxWeek(nextWeekResponse, baseUrl, freshSchedule);
+                                    if (nextWeekSchedule != null && !nextWeekSchedule.getDays().isEmpty()) {
+                                        UrnikStorage.saveSchedule(MainActivity.this, nextWeekSchedule);
+                                        mainHandler.post(() -> {
+                                            pbLoading.setVisibility(View.GONE);
+                                            btnRefresh.setVisibility(View.VISIBLE);
+                                            displaySchedule(nextWeekSchedule);
+                                            focusedDayIndex = 0; // Monday
+                                            if (!isTableView) {
+                                                renderThreeDayView(nextWeekSchedule, 0);
+                                            }
+                                        });
+                                        return;
+                                    }
+                                } catch (Exception ignored) {
+                                    // Fallback to base week if next week fetch fails
+                                }
+                            }
+                        }
+                    }
+
                     UrnikStorage.saveSchedule(MainActivity.this, freshSchedule);
 
                     mainHandler.post(() -> {
@@ -1153,6 +1648,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
         executor.shutdown();
     }
 }

@@ -18,7 +18,7 @@
     
     <!-- Three-day cell -->
     <dimen name="cell_padding_horizontal">6dp</dimen>
-    <dimen name="cell_padding_vertical">3dp</dimen>
+    <dimen name="cell_padding_vertical">2.5dp</dimen>
     <dimen name="cell_subject_size">12.5sp</dimen>
     <dimen name="cell_room_size">9sp</dimen>
     <dimen name="cell_teacher_size">10sp</dimen>

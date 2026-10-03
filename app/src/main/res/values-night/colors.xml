@@ -13,6 +13,9 @@
     <color name="ea_gray_bg">#0B1120</color>
     <color name="ea_card_border">#293548</color>
     <color name="ea_class_divider">#475569</color>
+    <color name="ea_hour_divider">#334155</color>
+    <color name="ea_subitem_chip_bg">#1A253A</color>
+    <color name="ea_subitem_chip_border">#2E3D56</color>
     
     <color name="ea_text_primary">#F8FAFC</color>
     <color name="ea_text_secondary">#94A3B8</color>
@@ -44,10 +47,13 @@
     <color name="ea_time_passed_border">#1E293B</color>
     <color name="ea_time_active">#1E3A8A</color>
     
-    <!-- Lunch break (Malica): warm dark gold in dark mode -->
-    <color name="ea_malica_bg">#3A2703</color>
-    <color name="ea_malica_border">#EAB308</color>
-    <color name="ea_malica_text">#FEF08A</color>
+    <!-- Lunch break (Malica): elegant violet / lavender in dark mode -->
+    <color name="ea_malica_bg">#231C38</color>
+    <color name="ea_malica_border">#6B46C1</color>
+    <color name="ea_malica_text">#E9D5FF</color>
+    <color name="ea_malica_dimmed_bg">#181426</color>
+    <color name="ea_malica_dimmed_border">#382952</color>
+    <color name="ea_malica_dimmed_text">#A78BFA</color>
     
     <!-- School events -->
     <color name="ea_event_orange">#FBBF24</color>
