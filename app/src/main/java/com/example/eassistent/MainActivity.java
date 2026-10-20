@@ -1,5 +1,8 @@
 package com.example.eassistent;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -91,12 +94,18 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar pbLoading;
 
     // 1. Three-Day Focus View (Smooth horizontally scrolling full week strip showing 3 days at a time)
+    private LinearLayout llThreeDayMainContainer;
     private FrameLayout flThreeDayWrapper;
     private HorizontalScrollView hsvThreeDayView;
     private LinearLayout llThreeDayContentRoot;
     private LinearLayout llThreeDayHeadersStrip;
     private LinearLayout llThreeDayCardsStrip;
     private LinearLayout llGradientOverlays;
+
+    // Fixed Time Strip (minimalistic, no bg, no CAS header, does not cover day before)
+    private LinearLayout llFixedTimeStrip;
+    private View vTimeStripHeaderSpacer;
+    private LinearLayout llTimeStripCards;
 
     private final LinearLayout[] headerCols = new LinearLayout[7];
     private final TextView[] headerBadges = new TextView[7];
@@ -121,6 +130,11 @@ public class MainActivity extends AppCompatActivity {
     private VelocityTracker velocityTracker;
     private float startTouchX;
     private float startTouchY;
+    private int downFocusedDay = 0;
+    private ValueAnimator snapAnimator;
+    private boolean isSnapping = false;
+    private boolean isTrackingDrag = false;
+    private int initialDragScrollX = 0;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -172,12 +186,21 @@ public class MainActivity extends AppCompatActivity {
         updateRefreshButtonPosition();
 
         // 3-Day Focus View (7 columns: Spacer 0, Mon 1, Tue 2, Wed 3, Thu 4, Fri 5, Spacer 6)
+        llThreeDayMainContainer = findViewById(R.id.llThreeDayMainContainer);
         flThreeDayWrapper = findViewById(R.id.flThreeDayWrapper);
         hsvThreeDayView = findViewById(R.id.hsvThreeDayView);
         llThreeDayContentRoot = findViewById(R.id.llThreeDayContentRoot);
         llThreeDayHeadersStrip = findViewById(R.id.llThreeDayHeadersStrip);
         llThreeDayCardsStrip = findViewById(R.id.llThreeDayCardsStrip);
         llGradientOverlays = findViewById(R.id.llGradientOverlays);
+
+        llFixedTimeStrip = findViewById(R.id.llFixedTimeStrip);
+        vTimeStripHeaderSpacer = findViewById(R.id.vTimeStripHeaderSpacer);
+        llTimeStripCards = findViewById(R.id.llTimeStripCards);
+
+        if (llFixedTimeStrip != null) {
+            llFixedTimeStrip.setOnTouchListener((v, event) -> false);
+        }
 
         headerCols[0] = findViewById(R.id.llHeader0);
         headerCols[1] = findViewById(R.id.llHeader1);
@@ -268,71 +291,134 @@ public class MainActivity extends AppCompatActivity {
             }
             velocityTracker.addMovement(event);
 
-            switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
+            int action = event.getActionMasked();
+
+            if (action == MotionEvent.ACTION_DOWN || (!isTrackingDrag && action == MotionEvent.ACTION_MOVE)) {
+                if (!isTrackingDrag) {
+                    isTrackingDrag = true;
+                    if (snapAnimator != null && snapAnimator.isRunning()) {
+                        snapAnimator.cancel();
+                    }
                     startTouchX = event.getRawX();
                     startTouchY = event.getRawY();
-                    break;
-
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    velocityTracker.computeCurrentVelocity(1000);
-                    float vx = velocityTracker.getXVelocity();
-                    float dx = event.getRawX() - startTouchX;
-                    velocityTracker.recycle();
-                    velocityTracker = null;
-
-                    if (columnWidth <= 0) break;
-
-                    int currentScrollX = hsvThreeDayView.getScrollX();
-                    int targetDay;
-
-                    int minFlingVelocity = dpToPx(350);
-                    int flickDist = dpToPx(24);
-
-                    if (Math.abs(dx) > flickDist && vx < -minFlingVelocity) {
-                        targetDay = focusedDayIndex + 1;
-                    } else if (Math.abs(dx) > flickDist && vx > minFlingVelocity) {
-                        targetDay = focusedDayIndex - 1;
+                    initialDragScrollX = hsvThreeDayView.getScrollX();
+                    if (columnWidth > 0) {
+                        downFocusedDay = Math.max(0, Math.min(4, Math.round((float) initialDragScrollX / columnWidth)));
                     } else {
-                        targetDay = Math.round((float) currentScrollX / columnWidth);
+                        downFocusedDay = focusedDayIndex;
                     }
+                }
+            }
 
-                    if (targetDay < 0) {
-                        int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
-                                ? currentSchedule.getCurrentWeekNumber() : 5;
-                        if (curWeek > 1) {
-                            navigateWeek(-1, 4);
-                        } else {
-                            scrollToDay(0, true);
-                        }
-                    } else if (targetDay > 4) {
-                        int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
-                                ? currentSchedule.getCurrentWeekNumber() : 5;
-                        int total = currentSchedule != null && currentSchedule.getTotalWeeks() > 0
-                                ? currentSchedule.getTotalWeeks() : 53;
-                        if (curWeek < total) {
-                            navigateWeek(1, 0);
-                        } else {
-                            scrollToDay(4, true);
-                        }
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                isTrackingDrag = false;
+                velocityTracker.computeCurrentVelocity(1000);
+                float vx = velocityTracker.getXVelocity();
+                velocityTracker.recycle();
+                velocityTracker = null;
+
+                if (columnWidth <= 0) return false;
+
+                int currentScrollX = hsvThreeDayView.getScrollX();
+                int scrollDelta = currentScrollX - initialDragScrollX;
+                float stepThreshold = columnWidth * 0.16f;
+                float minFlingVelocity = dpToPx(280);
+
+                int targetDay = downFocusedDay;
+                if (scrollDelta > stepThreshold || vx < -minFlingVelocity) {
+                    targetDay = downFocusedDay + 1;
+                } else if (scrollDelta < -stepThreshold || vx > minFlingVelocity) {
+                    targetDay = downFocusedDay - 1;
+                } else {
+                    targetDay = downFocusedDay;
+                }
+
+                // Strict single-step clamping: never jump more than 1 day in a single swipe!
+                targetDay = Math.max(downFocusedDay - 1, Math.min(downFocusedDay + 1, targetDay));
+
+                if (targetDay < 0) {
+                    int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
+                            ? currentSchedule.getCurrentWeekNumber() : 5;
+                    if (curWeek > 1) {
+                        navigateWeek(-1, 4);
                     } else {
-                        scrollToDay(targetDay, true);
+                        animateSnapToDay(0);
                     }
-                    return true;
+                } else if (targetDay > 4) {
+                    int curWeek = currentSchedule != null && currentSchedule.getCurrentWeekNumber() > 0
+                            ? currentSchedule.getCurrentWeekNumber() : 5;
+                    int total = currentSchedule != null && currentSchedule.getTotalWeeks() > 0
+                            ? currentSchedule.getTotalWeeks() : 53;
+                    if (curWeek < total) {
+                        navigateWeek(1, 0);
+                    } else {
+                        animateSnapToDay(4);
+                    }
+                } else {
+                    animateSnapToDay(targetDay);
+                }
+                return true;
             }
             return false;
         });
 
         hsvThreeDayView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            if (columnWidth > 0) {
+            applyContinuousBubbleAnimation(scrollX);
+            if (columnWidth > 0 && !isSnapping) {
                 int approxDay = Math.max(0, Math.min(4, Math.round((float) scrollX / columnWidth)));
                 if (approxDay != focusedDayIndex) {
                     focusedDayIndex = approxDay;
-                    updateDaySelectionVisuals(focusedDayIndex);
                 }
             }
         });
+    }
+
+    private void animateSnapToDay(int day) {
+        final int targetDay = Math.max(0, Math.min(4, day));
+        this.focusedDayIndex = targetDay;
+
+        if (columnWidth <= 0 && flThreeDayWrapper != null) {
+            updateColumnWidths(flThreeDayWrapper.getWidth());
+        }
+        if (columnWidth <= 0 || hsvThreeDayView == null) return;
+
+        if (snapAnimator != null && snapAnimator.isRunning()) {
+            snapAnimator.cancel();
+        }
+
+        int startX = hsvThreeDayView.getScrollX();
+        final int targetX = targetDay * columnWidth;
+
+        if (startX == targetX) {
+            applyContinuousBubbleAnimation(targetX);
+            updateDaySelectionVisuals(targetDay);
+            return;
+        }
+
+        isSnapping = true;
+        snapAnimator = ValueAnimator.ofInt(startX, targetX);
+        snapAnimator.setDuration(260);
+        snapAnimator.setInterpolator(new DecelerateInterpolator(1.8f));
+        snapAnimator.addUpdateListener(animation -> {
+            int currentX = (int) animation.getAnimatedValue();
+            hsvThreeDayView.scrollTo(currentX, 0);
+            applyContinuousBubbleAnimation(currentX);
+        });
+        snapAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                isSnapping = false;
+                hsvThreeDayView.scrollTo(targetX, 0);
+                applyContinuousBubbleAnimation(targetX);
+                updateDaySelectionVisuals(targetDay);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                isSnapping = false;
+            }
+        });
+        snapAnimator.start();
     }
 
     private void updateColumnWidths(int containerWidth) {
@@ -384,81 +470,99 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (columnWidth > 0 && hsvThreeDayView != null) {
-            int targetX = dayIdx * columnWidth;
             if (smooth) {
-                hsvThreeDayView.smoothScrollTo(targetX, 0);
+                animateSnapToDay(dayIdx);
             } else {
+                if (snapAnimator != null && snapAnimator.isRunning()) {
+                    snapAnimator.cancel();
+                }
+                int targetX = dayIdx * columnWidth;
                 hsvThreeDayView.scrollTo(targetX, 0);
+                applyContinuousBubbleAnimation(targetX);
+                updateDaySelectionVisuals(dayIdx);
             }
         }
-
-        updateDaySelectionVisuals(dayIdx);
     }
 
-    private void updateDaySelectionVisuals(int focusedIdx) {
-        if (currentSchedule == null || currentSchedule.getDays().isEmpty()) return;
+    private void applyContinuousBubbleAnimation(int scrollX) {
+        if (columnWidth <= 0 || currentSchedule == null) return;
+
+        float currentPosition = (float) scrollX / (float) columnWidth;
 
         for (int i = 0; i < 7; i++) {
             LinearLayout hCol = headerCols[i];
             MaterialCardView cCol = cardCols[i];
             if (hCol == null || cCol == null) continue;
 
-            if (i == 0) {
-                float alpha = (focusedIdx == 0) ? 0.78f : 0.45f;
-                hCol.setAlpha(alpha);
-                cCol.setAlpha(alpha);
-                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
-                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
-                cCol.setStrokeWidth(dpToPx(1f));
-                continue;
+            int dayTargetIndex = i - 1;
+            float distance = Math.abs(currentPosition - dayTargetIndex);
+            float factor = Math.max(0f, 1f - Math.min(1f, distance));
+
+            // Cosine bell curve for natural organic bubble expansion
+            float bubble = (float) ((1.0 - Math.cos(factor * Math.PI)) / 2.0);
+
+            // Card scale: side cards at 0.90x, focused center card bubbles up to 1.045x
+            float cardScaleX = 0.90f + (0.145f * bubble);
+            float cardScaleY = 0.95f + (0.07f * bubble);
+            float cW = cCol.getWidth() > 0 ? cCol.getWidth() : (columnWidth - dpToPx(7f));
+            float cH = cCol.getHeight() > 0 ? cCol.getHeight() : 0;
+            cCol.setPivotX(cW / 2f);
+            if (cH > 0) {
+                cCol.setPivotY(cH / 2f);
             }
+            cCol.setScaleX(cardScaleX);
+            cCol.setScaleY(cardScaleY);
 
-            if (i == 6) {
-                float alpha = (focusedIdx == 4) ? 0.78f : 0.45f;
-                hCol.setAlpha(alpha);
-                cCol.setAlpha(alpha);
-                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
-                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
-                cCol.setStrokeWidth(dpToPx(1f));
-                continue;
+            // Card elevation: 3D popping forward above adjacent cards
+            cCol.setCardElevation(dpToPx(7f) * bubble);
+            cCol.setTranslationZ(dpToPx(4f) * bubble);
+
+            // Header scale: side is 0.92x, focused center is 1.02x
+            float headerScale = 0.92f + (0.10f * bubble);
+            float hW = hCol.getWidth() > 0 ? hCol.getWidth() : (columnWidth - dpToPx(7f));
+            float hH = hCol.getHeight() > 0 ? hCol.getHeight() : 0;
+            hCol.setPivotX(hW / 2f);
+            if (hH > 0) {
+                hCol.setPivotY(hH / 2f);
             }
+            hCol.setScaleX(headerScale);
+            hCol.setScaleY(headerScale);
 
-            int dayIdx = i - 1; // 0..4
-            boolean isFocused = (dayIdx == focusedIdx);
-            boolean isAdjacent = (Math.abs(dayIdx - focusedIdx) == 1);
-            boolean isToday = (dayIdx < currentSchedule.getDays().size() && isDayActuallyToday(currentSchedule.getDays().get(dayIdx)));
-
-            if (isFocused) {
-                hCol.setAlpha(1.0f);
-                cCol.setAlpha(1.0f);
-                if (isToday) {
-                    hCol.setBackgroundResource(R.drawable.bg_header_today);
-                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_today_border));
-                    cCol.setStrokeWidth(dpToPx(1.5f));
-                } else {
-                    hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
-                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
-                    cCol.setStrokeWidth(dpToPx(1f));
-                }
-            } else if (isAdjacent) {
-                hCol.setAlpha(0.78f);
-                cCol.setAlpha(0.78f);
-                if (isToday) {
-                    hCol.setBackgroundResource(R.drawable.bg_header_today);
-                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_today_border));
-                    cCol.setStrokeWidth(dpToPx(1.5f));
-                } else {
-                    hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
-                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
-                    cCol.setStrokeWidth(dpToPx(1f));
-                }
+            if (i == 0 || i == 6) {
+                float spacerAlpha = 0.35f + (0.40f * bubble);
+                hCol.setAlpha(spacerAlpha);
+                cCol.setAlpha(spacerAlpha);
             } else {
-                hCol.setAlpha(0.45f);
-                cCol.setAlpha(0.45f);
-                hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
-                cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
-                cCol.setStrokeWidth(dpToPx(1f));
+                float alpha = 0.60f + (0.40f * bubble);
+                hCol.setAlpha(alpha);
+                cCol.setAlpha(alpha);
+
+                int dayIdx = i - 1;
+                boolean isToday = (dayIdx < currentSchedule.getDays().size() &&
+                        isDayActuallyToday(currentSchedule.getDays().get(dayIdx)));
+
+                if (bubble > 0.55f) {
+                    if (isToday) {
+                        hCol.setBackgroundResource(R.drawable.bg_header_today);
+                        cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_today_border));
+                        cCol.setStrokeWidth(dpToPx(1.5f));
+                    } else {
+                        hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                        cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                        cCol.setStrokeWidth(dpToPx(1f));
+                    }
+                } else {
+                    hCol.setBackgroundResource(R.drawable.bg_header_dimmed);
+                    cCol.setStrokeColor(ContextCompat.getColor(this, R.color.ea_card_border));
+                    cCol.setStrokeWidth(dpToPx(1f));
+                }
             }
+        }
+    }
+
+    private void updateDaySelectionVisuals(int focusedIdx) {
+        if (columnWidth > 0) {
+            applyContinuousBubbleAnimation(focusedIdx * columnWidth);
         }
     }
 
@@ -827,7 +931,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateViewVisibility() {
-        if (flThreeDayWrapper != null) {
+        if (llThreeDayMainContainer != null) {
+            llThreeDayMainContainer.setVisibility(!isTableView ? View.VISIBLE : View.GONE);
+        } else if (flThreeDayWrapper != null) {
             flThreeDayWrapper.setVisibility(!isTableView ? View.VISIBLE : View.GONE);
         }
         if (layoutTableView != null) {
@@ -852,6 +958,9 @@ public class MainActivity extends AppCompatActivity {
         this.currentSchedule = data;
         if (data == null || data.getDays().isEmpty()) {
             tvEmptyState.setVisibility(View.VISIBLE);
+            if (llThreeDayMainContainer != null) {
+                llThreeDayMainContainer.setVisibility(View.GONE);
+            }
             if (flThreeDayWrapper != null) {
                 flThreeDayWrapper.setVisibility(View.GONE);
             }
@@ -1071,7 +1180,140 @@ public class MainActivity extends AppCompatActivity {
 
         updateDaySelectionVisuals(focusedDayIndex);
 
+        renderFixedTimeStrip(data, startHour, endHour);
+
+        llThreeDayHeadersStrip.post(() -> {
+            int headerHeight = llThreeDayHeadersStrip.getHeight();
+            if (headerHeight > 0 && vTimeStripHeaderSpacer != null) {
+                ViewGroup.LayoutParams lp = vTimeStripHeaderSpacer.getLayoutParams();
+                if (lp != null && lp.height != headerHeight) {
+                    lp.height = headerHeight;
+                    vTimeStripHeaderSpacer.setLayoutParams(lp);
+                }
+            }
+        });
+
         hsvThreeDayView.post(() -> scrollToDay(focusedDayIndex, false));
+    }
+
+    private String[] getHourStartEndTimes(ScheduleData data, int hourIdx) {
+        String timeStr = null;
+        if (data != null && data.getHourTimes() != null && hourIdx < data.getHourTimes().size()) {
+            timeStr = data.getHourTimes().get(hourIdx);
+        }
+        if ((timeStr == null || timeStr.trim().isEmpty()) && data != null && data.getDays() != null) {
+            for (DaySchedule day : data.getDays()) {
+                if (hourIdx < day.getPeriods().size()) {
+                    PeriodSchedule p = day.getPeriods().get(hourIdx);
+                    if (p != null && p.getHourTime() != null && !p.getHourTime().trim().isEmpty()) {
+                        timeStr = p.getHourTime();
+                        break;
+                    }
+                }
+            }
+        }
+        if (timeStr == null || !timeStr.contains("-")) {
+            // Fallback timetable slots
+            switch (hourIdx) {
+                case 0: return new String[]{"6:55", "7:40"};
+                case 1: return new String[]{"7:45", "8:30"};
+                case 2: return new String[]{"8:35", "9:20"};
+                case 3: return new String[]{"9:25", "10:10"};
+                case 4: return new String[]{"10:15", "11:00"};
+                case 5: return new String[]{"11:00", "11:45"};
+                case 6: return new String[]{"11:50", "12:35"};
+                case 7: return new String[]{"12:40", "13:25"};
+                case 8: return new String[]{"13:30", "14:15"};
+                case 9: return new String[]{"14:20", "15:05"};
+                default: return new String[]{"", ""};
+            }
+        }
+        String[] parts = timeStr.split("-");
+        String start = parts[0].trim();
+        String end = parts.length > 1 ? parts[1].trim() : "";
+        return new String[]{start, end};
+    }
+
+    private boolean isHourMalicaAcrossWeek(ScheduleData data, int hourIdx) {
+        if (data == null || data.getDays().isEmpty()) return hourIdx == 5;
+        for (DaySchedule day : data.getDays()) {
+            if (hourIdx < day.getPeriods().size()) {
+                if (isMalicaPeriod(day.getPeriods().get(hourIdx))) {
+                    return true;
+                }
+            }
+        }
+        return hourIdx == 5;
+    }
+
+    private void renderFixedTimeStrip(ScheduleData data, int startHour, int endHour) {
+        if (llTimeStripCards == null) return;
+        llTimeStripCards.removeAllViews();
+
+        Calendar now = Calendar.getInstance(TZ_SLOVENIA);
+        int nowMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+
+        int todayIdx = getTodayDayIndex(data);
+        boolean isViewingCurrentWeek = (currentSchedule != null &&
+                currentSchedule.getCurrentWeekNumber() == getCurrentWeekByDate(currentSchedule));
+        boolean hasToday = isViewingCurrentWeek && !isWeekend();
+
+        int activeHour = -1;
+        if (hasToday && todayIdx >= 0 && todayIdx < data.getDays().size()) {
+            DaySchedule todayDay = data.getDays().get(todayIdx);
+            for (int i = 0; i < todayDay.getPeriods().size(); i++) {
+                PeriodSchedule p = todayDay.getPeriods().get(i);
+                int[] se = parseStartEndMinutes(p);
+                if (se[0] > 0 && se[1] > 0) {
+                    if (nowMinutes >= se[0] && nowMinutes < se[1]) {
+                        activeHour = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        LayoutInflater inflater = LayoutInflater.from(this);
+        for (int h = startHour; h <= endHour; h++) {
+            if (h > startHour) {
+                View div = new View(this);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1.5f));
+                lp.setMargins(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2));
+                div.setLayoutParams(lp);
+                div.setBackgroundColor(Color.TRANSPARENT);
+                llTimeStripCards.addView(div);
+            }
+
+            String[] se = getHourStartEndTimes(data, h);
+            String startTime = se[0];
+            String endTime = se[1];
+
+            View rowView = inflater.inflate(R.layout.item_three_day_time_row, llTimeStripCards, false);
+            TextView tvStart = rowView.findViewById(R.id.tvTimeStart);
+            TextView tvEnd = rowView.findViewById(R.id.tvTimeEnd);
+
+            tvStart.setText(startTime);
+            tvEnd.setText(endTime);
+
+            boolean isMalica = isHourMalicaAcrossWeek(data, h);
+
+            if (hasToday && h == activeHour) {
+                tvStart.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_active_text));
+                tvEnd.setTextColor(ContextCompat.getColor(this, R.color.ea_hour_active_text));
+            } else if (isMalica) {
+                tvStart.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_text));
+                tvEnd.setTextColor(ContextCompat.getColor(this, R.color.ea_malica_dimmed_text));
+            } else if (hasToday && activeHour != -1 && h < activeHour) {
+                tvStart.setTextColor(ContextCompat.getColor(this, R.color.ea_text_muted));
+                tvEnd.setTextColor(ContextCompat.getColor(this, R.color.ea_text_muted));
+            } else {
+                tvStart.setTextColor(ContextCompat.getColor(this, R.color.ea_text_primary));
+                tvEnd.setTextColor(ContextCompat.getColor(this, R.color.ea_text_secondary));
+            }
+
+            llTimeStripCards.addView(rowView);
+        }
     }
 
     private void addHourDivider(LinearLayout col) {

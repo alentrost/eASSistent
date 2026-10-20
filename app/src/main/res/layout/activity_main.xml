@@ -224,15 +224,50 @@
         android:textSize="15sp"
         android:visibility="gone" />
 
-    <!-- 1. THREE-DAY FOCUS VIEW WRAPPER (Smooth horizontally scrolling full week strip showing 3 days at a time) -->
-    <FrameLayout
-        android:id="@+id/flThreeDayWrapper"
+    <!-- 1. THREE-DAY FOCUS VIEW CONTAINER (Fixed time column on left + 3-day scroll wrapper) -->
+    <LinearLayout
+        android:id="@+id/llThreeDayMainContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:clipChildren="true"
-        android:clipToPadding="false"
+        android:orientation="horizontal"
         android:visibility="visible">
+
+        <!-- Fixed Time Column (Minimalistic, no background, no CAS header, does not cover day before) -->
+        <LinearLayout
+            android:id="@+id/llFixedTimeStrip"
+            android:layout_width="@dimen/time_strip_width"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false"
+            android:orientation="vertical">
+
+            <!-- Empty header spacer matching day headers height (NO ČAS header) -->
+            <View
+                android:id="@+id/vTimeStripHeaderSpacer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp" />
+
+            <!-- Cards space aligned with period cards (NO background) -->
+            <LinearLayout
+                android:id="@+id/llTimeStripCards"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginBottom="4dp"
+                android:clickable="false"
+                android:focusable="false"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+
+        <!-- Smooth horizontally scrolling 3-day wrapper -->
+        <FrameLayout
+            android:id="@+id/flThreeDayWrapper"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
 
         <!-- Smooth horizontally scrolling full week strip -->
         <HorizontalScrollView
@@ -247,6 +282,8 @@
                 android:id="@+id/llThreeDayContentRoot"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
                 <!-- 7-Column Headers: Spacer 0 | Mon 1 | Tue 2 | Wed 3 | Thu 4 | Fri 5 | Spacer 6 -->
@@ -255,6 +292,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="4dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:orientation="horizontal">
 
                     <!-- Col 0: Spacer Header -->
@@ -560,6 +599,8 @@
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:layout_marginBottom="4dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:orientation="horizontal">
 
                     <!-- Card 0: Spacer -->
@@ -763,6 +804,8 @@
         </LinearLayout>
 
     </FrameLayout>
+
+    </LinearLayout>
 
     <!-- 2. FULL WEEK TABLE VIEW (Accessible via Toggle Button) -->
     <LinearLayout

@@ -36,4 +36,11 @@
     <dimen name="fab_size">52dp</dimen>
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="fab_padding">13dp</dimen>
+    
+    <!-- Fixed Time Strip -->
+    <dimen name="time_strip_width">36dp</dimen>
+    <dimen name="time_strip_header_title_size">10sp</dimen>
+    <dimen name="time_strip_header_sub_size">8sp</dimen>
+    <dimen name="time_strip_start_size">10sp</dimen>
+    <dimen name="time_strip_end_size">8.5sp</dimen>
 </resources>

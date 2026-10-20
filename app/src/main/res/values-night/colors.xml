@@ -65,4 +65,10 @@
     <color name="ea_gradient_edge_left_end">#000B1120</color>
     <color name="ea_gradient_edge_right_start">#000B1120</color>
     <color name="ea_gradient_edge_right_end">#70070C16</color>
+    
+    <!-- Fixed Time Strip (semi-transparent) -->
+    <color name="ea_time_strip_bg">#E60B1120</color>
+    <color name="ea_time_strip_border">#66334155</color>
+    <color name="ea_time_strip_header_bg">#E61E293B</color>
+    <color name="ea_time_strip_active_bg">#403B82F6</color>
 </resources>

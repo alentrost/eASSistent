@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/llTimeRowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:clickable="false"
+    android:focusable="false"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/tvTimeStart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:focusable="false"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="7:45"
+        android:textColor="@color/ea_text_primary"
+        android:textSize="@dimen/time_strip_start_size"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvTimeEnd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:clickable="false"
+        android:focusable="false"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="8:30"
+        android:textColor="@color/ea_text_secondary"
+        android:textSize="@dimen/time_strip_end_size" />
+
+</LinearLayout>
