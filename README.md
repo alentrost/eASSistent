@@ -2,6 +2,13 @@
 
 Android aplikacija za hiter pregled šolskega urnika iz sistema eAsistent. Aplikacija pridobi urnik neposredno s spletne strani urniki.easistent.com, ga razčleni in prikaže v pregledni obliki.
 
+## Novosti v različici 1.3 (V1.3)
+
+- **Nov levi časovni trak (ura/časovni razpon)**: Prikaz točnega časovnega poteka posameznih šolskih ur na levi strani 3-dnevnega pogleda.
+- **Poudarek trenutne ure v časovnem traku**: Samodejna vizualna poudaritev aktivne ure v časovnem traku v realnem času.
+- **Izboljšana prilagodljivost zaslonom**: Optimizirane dimenzije za različne gostote in širine zaslonov (`sw320dp`, `sw400dp`).
+- **Posodobljene povezave do najnovejše izdaje**: Neposreden dostop do [eASSistent Releases v1.3](https://github.com/alentrost/eASSistent/releases/tag/v1.3).
+
 ## Novosti v različici 1.2 (V1.2)
 
 - **Popolno simetrično centriranje 3-dnevnega pogleda**: Odpravljena napaka pri robnih odmikih (Android RTL resolucija), ki je povzročala zamik stolpcev in prikaz roba 4. dneva. Fokusirani dan je sedaj vedno v popolnem matematičnem središču zaslona z enakomernimi presledki.
